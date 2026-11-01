@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -59,12 +60,18 @@ def play(
     dtype=np.float32,
     fresh_sensors: bool = False,
     clip: bool = True,
+    runner_phase: bool = False,
     qpos0=None,
     qvel0=None,
 ):
     """Run ``steps`` physics steps. Returns (policy log [(it, obs, action)], base heights
     per step, final qpos). ``qpos0``/``qvel0`` override the initial state after the loop's
-    own setup (used for seeded starts)."""
+    own setup (used for seeded starts).
+
+    ``runner_phase`` computes the gait phase as runner v1.4.0 does: radians, advanced once
+    per policy step after the action by ``fmod(phase + 2 pi f decimation dt + pi, 2 pi) - pi``
+    and read as cos/sin. play_mujoco.py accumulates a fraction ``gait_process`` every physics
+    step and reads cos/sin of ``2 pi gait_process``: the same phase, rounded differently."""
     import torch
 
     cfg = training_config(root)
@@ -117,6 +124,8 @@ def play(
     else:
         gait_frequency = np.average(cfg["commands"]["gait_frequency"])
     gait_process = 0.0
+    phase = 0.0  # runner_phase: gait_offsets [0.0]
+    policy_dt = cfg["control"]["decimation"] * mj_model.opt.timestep
     it = 0
     log, heights = [], []
     trunk = mj_model.body("Trunk").id
@@ -135,8 +144,12 @@ def play(
             obs[6] = lin_vel_x * cfg["normalization"]["lin_vel"]
             obs[7] = lin_vel_y * cfg["normalization"]["lin_vel"]
             obs[8] = ang_vel_yaw * cfg["normalization"]["ang_vel"]
-            obs[9] = np.cos(2 * np.pi * gait_process) * (gait_frequency > 1.0e-8)
-            obs[10] = np.sin(2 * np.pi * gait_process) * (gait_frequency > 1.0e-8)
+            if runner_phase:
+                obs[9] = np.cos(phase) * (gait_frequency > 1.0e-8)
+                obs[10] = np.sin(phase) * (gait_frequency > 1.0e-8)
+            else:
+                obs[9] = np.cos(2 * np.pi * gait_process) * (gait_frequency > 1.0e-8)
+                obs[10] = np.sin(2 * np.pi * gait_process) * (gait_frequency > 1.0e-8)
             obs[11:23] = (dof_pos - default_dof_pos) * cfg["normalization"]["dof_pos"]
             obs[23:35] = dof_vel * cfg["normalization"]["dof_vel"]
             obs[35:47] = actions
@@ -148,6 +161,8 @@ def play(
                 actions[:] = np.clip(actions, -lim, lim)
             dof_targets[:] = default_dof_pos + cfg["control"]["action_scale"] * actions
             log.append((it, obs.copy(), raw))
+            step = 2 * math.pi * float(gait_frequency) * policy_dt
+            phase = math.fmod(phase + step + math.pi, 2 * math.pi) - math.pi
         mj_data.ctrl = np.clip(
             dof_stiffness * (dof_targets - dof_pos) - dof_damping * dof_vel,
             mj_model.actuator_ctrlrange[:, 0],

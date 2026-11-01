@@ -15,8 +15,14 @@ loop with two documented deviations, and otherwise verbatim (constant command, n
 
 Both sides run the same pinned MJCF from the same initial state with the same command.
 
-Pass rule, as for the G1 stock controller: the same first policy step, and against the
-float64 reference identical actions and observations within 1e-12. The verbatim loop
+3. Phase arithmetic: play_mujoco.py accumulates the gait phase as a fraction every physics
+   step (``fmod(gp + dt f, 1)``, read as cos/sin of ``2 pi gp``); the runner advances it in
+   radians once per policy step (``fmod(phase + 2 pi f 10 dt + pi, 2 pi) - pi``). The same
+   phase, rounded differently (~2e-14 over 100 ticks). The graded reference uses the runner's
+   arithmetic, so no tolerance is needed; the publisher's is reported.
+
+Pass rule: the same first policy step, and against the float64 reference observations and
+actions exactly equal (``==``). The verbatim loop
 (stale reads, float32 and float64) is reported, not graded; ``no_clip`` shows the +/-1
 action clip (absent from runner v1.4.0) is never reached.
 
@@ -48,7 +54,6 @@ TERMS = [
     ("joint_vel", 12),
     ("last_action", 12),
 ]
-TOL = 1e-12
 
 
 def ours(command, steps, qpos0, root=ROOT):
@@ -113,14 +118,20 @@ def passes(d: dict) -> bool:
     return (
         d["first_policy_step"]["reference"] == d["first_policy_step"]["runner"]
         and d["max_abs_diff"]["action"] == 0.0
-        and d["max_abs_diff"]["obs"] <= TOL
+        and d["max_abs_diff"]["obs"] == 0.0
     )
 
 
 VARIANTS = {
-    "float64": {"dtype": np.float64, "fresh_sensors": True},  # graded
-    "float32": {"fresh_sensors": True},
-    "float64_no_clip": {"dtype": np.float64, "fresh_sensors": True, "clip": False},
+    "float64": {"dtype": np.float64, "fresh_sensors": True, "runner_phase": True},  # graded
+    "float64_publisher_phase": {"dtype": np.float64, "fresh_sensors": True},
+    "float32": {"fresh_sensors": True, "runner_phase": True},
+    "float64_no_clip": {
+        "dtype": np.float64,
+        "fresh_sensors": True,
+        "runner_phase": True,
+        "clip": False,
+    },
     "verbatim_stale_float32": {},
     "verbatim_stale_float64": {"dtype": np.float64},
 }
@@ -146,8 +157,9 @@ def run(command, ticks: int, root=ROOT) -> dict:
         "configuration_sha256": configuration("stock", root)[1],
         "command": list(command),
         "pass_rule": (
-            "same first policy step, and against the float64 reference identical actions and "
-            f"observations within {TOL:g}; the verbatim (stale-read) loop is reported, not graded"
+            "same first policy step, and against the float64 reference (fresh reads, runner "
+            "phase arithmetic) observations and actions exactly equal; the publisher-phase and "
+            "verbatim (stale-read) loops are reported, not graded"
         ),
         "passed": out["float64"]["passes_rule"],
         "variants": out,
