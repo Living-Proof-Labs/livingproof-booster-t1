@@ -30,7 +30,7 @@ import numpy as np
 import yaml
 
 from lpl_t1 import ROOT
-from lpl_t1.fetch import load_pins, local
+from livingproof_sim_mujoco.pins import load_pins, local
 from lpl_t1.scene import SCENE
 
 TRAINING_CONFIG = "envs/T1.yaml"

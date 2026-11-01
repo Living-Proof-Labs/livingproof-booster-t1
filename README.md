@@ -32,7 +32,7 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.de
 
 ## Tasks
 
-`uv sync`, `uv run python -m lpl_t1.fetch`, `uv run pytest tests` (CI: capability-verifier's walk-hallway `check` job), `task profile:measure`, `task profile:stand`.
+`uv sync`, `uv run pytest tests`, `uv run pytest tests` (CI: capability-verifier's walk-hallway `check` job), `task profile:measure`, `task profile:stand`.
 
 ## Rules
 

@@ -10,10 +10,16 @@ import numpy as np
 import pytest
 
 from lpl_t1 import ROOT
-from lpl_t1.fetch import local, sha256
+from livingproof_sim_mujoco import pins
+from livingproof_sim_mujoco.pins import sha256
 from lpl_t1.playground_reference import run, stand
 from lpl_t1.profiles import configuration, controller
 from lpl_t1.scene import build, raw_model
+
+
+def local(group: str, path: str):
+    return pins.local(group, path, ROOT)
+
 
 PG = "mujoco_playground/experimental/sim2sim/play_t1_joystick.py"
 

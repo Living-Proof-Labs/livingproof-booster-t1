@@ -7,11 +7,21 @@ import numpy as np
 import pytest
 
 from lpl_t1 import ROOT
-from lpl_t1.fetch import ChecksumError, fetch, local, sha256
+from livingproof_sim_mujoco import pins
+from livingproof_sim_mujoco.pins import ChecksumError, sha256
 from lpl_t1.measure import measure
 from lpl_t1.profiles import Unsupported, configuration, controller, robot, validate
 from lpl_t1.publisher import training_config
 from lpl_t1.scene import SCENE, build, place_pose, raw_model
+
+
+def local(group: str, path: str):
+    return pins.local(group, path, ROOT)
+
+
+def fetch(root=ROOT, opener=None):
+    return pins.fetch(root, opener) if opener else pins.fetch(root)
+
 
 PIN = "da396a06d6eed99e2de72d7749c48ee8748950f9"
 

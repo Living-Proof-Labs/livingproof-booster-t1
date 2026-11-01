@@ -20,9 +20,16 @@ import numpy as np
 import pytest
 import torch
 
-from lpl_t1.fetch import local
+from livingproof_sim_mujoco import pins
+
+from lpl_t1 import ROOT
 from lpl_t1.publisher import play
 from lpl_t1.reference import _initial_qpos, compare, ours, run
+
+
+def local(group: str, path: str):
+    return pins.local(group, path, ROOT)
+
 
 GRADED = {"dtype": np.float64, "fresh_sensors": True, "runner_phase": True}
 
