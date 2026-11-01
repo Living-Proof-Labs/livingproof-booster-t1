@@ -20,6 +20,16 @@ Living Proof Labs does not train controllers. A robot is validated only with a w
 - `configurations/stock.json`: the published controller with the obs/action layout, PD gains, default pose and rates of `envs/T1.yaml`, exactly as `play_mujoco.py` uses them. No tuning.
 - `src/lpl_t1/publisher.py`: `play_mujoco.py`'s loop without the viewer, for reference checks.
 
+## System dependencies
+
+Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.dev). Tasks run MuJoCo with `MUJOCO_GL=osmesa`, so the OSMesa software renderer is needed:
+
+    sudo apt-get install -y libosmesa6
+
+## Reference check
+
+`task reference` compares runner v1.4.0 with `play_mujoco.py`'s loop tick by tick and requires observations and actions to be exactly equal (`==`). The reference reads sensors fresh, uses T1.pt for the unpublished .pth, and advances the gait phase with the runner's arithmetic; each deviation is documented in `lpl_t1/reference.py`. Tests also check that a 1-ULP change is detected and that three runs are bit-identical.
+
 ## Tasks
 
 `task setup`, `task check`, `task test`, `task profile:measure`, `task profile:stand`.
