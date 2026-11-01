@@ -2,6 +2,7 @@
 import io
 import json
 
+import mujoco
 import numpy as np
 import pytest
 
@@ -144,3 +145,30 @@ def test_fetch_rejects_a_download_with_the_wrong_checksum(tmp_path):
     with pytest.raises(ChecksumError, match="f.txt"):
         fetch(tmp_path, opener=lambda url: io.BytesIO(b"tampered"))
     assert not (tmp_path / "d" / "f.txt").exists()
+
+
+def test_scenario_parameters_follow_the_pinned_acceptance_table():
+    from lpl_t1 import scenario as sc
+
+    text = local("specs", "specs/scenarios/walk-hallway/README.md").read_text()
+    for row in ("| `command_speed` | 0.5 m/s", "Route length 5.5 m", "| `required_passes` | 18"):
+        assert row in text, row
+    p = sc.parameters("stock")
+    assert (p["time_limit"], p["exit_x"], p["fall_height"]) == (27.0, 3.0, 0.44)
+    pre = {c["name"]: c["met"] for c in sc.preconditions("vendor-x")}
+    assert pre["configuration_offered"] is False
+
+
+def test_seed_noise_is_deterministic_and_starts_at_the_spawn():
+    from lpl_t1.walk import initial_state, runner_settings
+
+    scene = build()
+    m, c = scene.model, controller("stock", scene)
+    states = []
+    for _ in range(2):
+        d = mujoco.MjData(m)
+        initial_state(m, d, c, 7, runner_settings()["initial_noise"], "spawn-entrance")
+        states.append(d.qpos.copy())
+    np.testing.assert_array_equal(*states)
+    pos, _ = place_pose(m, "spawn-entrance")
+    assert abs(states[0][0] - pos[0]) <= 0.02 and states[0][2] == 0.72

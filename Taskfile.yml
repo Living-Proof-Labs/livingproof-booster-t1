@@ -21,7 +21,7 @@ tasks:
       - uv run ruff format --check .
       - 'uv run python -c "from lpl_t1.profiles import robot, configuration; [configuration(c[\"name\"]) for c in robot()[\"configurations\"]]; print(\"profiles valid\")"'
   test:
-    desc: Schemas, pins, published values vs upstream, scene
+    desc: Schemas, pins, published values vs upstream, scene, reference, lock, repin
     cmds: [uv run pytest tests --junitxml=artifacts/tests.xml]
   profile:measure:
     desc: Measure robot width, length, height and mass from the pinned model (robot.json dimensions)
@@ -32,3 +32,12 @@ tasks:
   reference:
     desc: Tick-by-tick match against booster_gym play_mujoco.py (fresh sensor reads, T1.pt as the actor); exits 1 on FAIL
     cmds: [uv run python -m lpl_t1.reference --ticks 500]
+  evidence:
+    desc: "walk-hallway sim evidence, no grading: task evidence [-- --allow-pending]"
+    cmds: ['uv run python -m lpl_t1.evidence {{.CONFIGURATION}} artifacts/evidence/{{.CONFIGURATION}} {{.CLI_ARGS}}']
+  repin:
+    desc: "Fill PENDING_RELEASE refs from real tags: task repin -- verifier=vX.Y.Z"
+    cmds: ['python3 tools/repin.py {{.CLI_ARGS}}']
+  repin:check:
+    desc: Fail while verification.lock.json has PENDING_RELEASE refs or the runner is not on its locked tag
+    cmds: [python3 tools/repin.py --check]
