@@ -11,13 +11,20 @@ The reference is play_mujoco.py with two documented deviations:
    training checkpoint, which booster_gym does not publish. Its export_model.py saves
    ``torch.jit.script(model.actor)`` as T1.pt, and ``act(obs).loc`` is ``actor(obs)``, so
    T1.pt is the same function.
+3. Phase arithmetic: the reference advances the gait phase as the runner does (radians,
+   once per policy step) instead of play_mujoco.py's per-physics-step fraction; the same
+   phase rounded differently. With it, observations and actions are exactly equal.
 """
 
+import numpy as np
 import pytest
 import torch
 
 from lpl_t1.fetch import local
-from lpl_t1.reference import run
+from lpl_t1.publisher import play
+from lpl_t1.reference import _initial_qpos, compare, ours, run
+
+GRADED = {"dtype": np.float64, "fresh_sensors": True, "runner_phase": True}
 
 TICKS = 100  # policy steps, 2 s of walking
 
@@ -41,8 +48,42 @@ def test_checkpoint_swap_t1_pt_is_the_actor_mean():
 def test_runner_matches_play_mujoco_with_fresh_sensor_reads(walk):
     v = walk["variants"]["float64"]
     assert v["first_policy_step"] == {"reference": 0, "runner": 0}
-    assert v["max_abs_diff"]["action"] == 0.0 and v["max_abs_diff"]["obs"] <= 1e-12
-    assert walk["passed"]
+    assert v["bit_exact"] and walk["passed"]
+    assert v["max_abs_diff"] == {"obs": 0.0, "action": 0.0}  # exact ==, no tolerance
+
+
+def test_publisher_phase_arithmetic_is_the_only_rounding_difference(walk):
+    v = walk["variants"]["float64_publisher_phase"]
+    assert v["max_abs_diff"]["action"] == 0.0
+    assert 0.0 < v["max_abs_diff"]["obs"] < 1e-12
+    assert {k for k, d in v["max_obs_diff_by_term"].items() if d > 0} == {"phase"}
+
+
+def _logs(steps=100, q0=None):
+    cmd = (0.5, 0.0, 0.0)
+    ref, _, rq = play(cmd, steps, **GRADED)
+    q0 = _initial_qpos(np.float64) if q0 is None else q0
+    got, gq = ours(cmd, steps, q0)
+    return ref, got, rq, gq
+
+
+def test_a_one_ulp_perturbation_is_detected():
+    """The comparison is sharp: 1 ULP on one joint angle of the runner's start fails it."""
+    q0 = _initial_qpos(np.float64).copy()
+    q0[7] = np.nextafter(q0[7], np.inf)
+    d = compare(*_logs(200, q0))
+    assert not d["bit_exact"] and d["first_divergence"] is not None
+
+
+def test_three_runs_are_bit_identical():
+    runs = [_logs(200) for _ in range(3)]
+    key = [
+        b"".join(o.tobytes() + np.asarray(a).tobytes() for _, o, a in log) + q.tobytes()
+        for ref, got, rq, gq in runs
+        for log, q in ((ref, rq), (got, gq))
+    ]
+    assert key[0::2] == [key[0]] * 3 and key[1::2] == [key[1]] * 3
+    assert compare(*runs[0])["bit_exact"]
 
 
 def test_the_stale_read_is_the_only_deviation_from_the_verbatim_loop(walk):
