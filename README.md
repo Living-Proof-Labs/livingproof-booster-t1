@@ -49,3 +49,27 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.de
 | `fall_height` | 0.44 m | about 2/3 of the 0.667 m standing trunk height |
 
 `task evidence` records 20 seeded trials (seeds 1-20, 0.5 m/s) for the capability verifier; grading is done there and by the capability report, never here. `task reference` compares the runner with `play_mujoco.py`.
+
+## Configuration `playground` (1.0.0)
+
+MuJoCo Playground's T1 joystick policy (`experimental/sim2sim/onnx/t1_policy.onnx`,
+mujoco_playground 12ad7f3, Apache-2.0; meshes from mujoco_menagerie 1b86ece, Apache-2.0)
+on Playground's own T1 MJCF and `<position>` actuators, with play_t1_joystick.py's
+observation, keyframe `home` default pose, 0.02 s / 0.002 s rates and action scale 1.0.
+Nothing is tuned. `task reference:playground` compares the runner with the script's
+`OnnxController` loop tick by tick.
+
+Deviations from the script, both documented in `configurations/playground.json` and
+`lpl_t1/playground_reference.py`:
+
+1. Flat-terrain scene instead of the rough heightfield the script loads (the hallway is flat).
+2. The script's `joint_velocities = data.qvel[6:]` is a view, so `joint_velocities[:2] *= 0`
+   also zeroes the head joint velocities of the simulation every policy step. The runner
+   zeroes them in the observation only. With `.copy()` the runner is bit-exact over 500
+   ticks; the verbatim loop is reported (it diverges from tick 1, final xy 4.44, 0.99 m vs
+   4.45, 1.04 m).
+
+robot.json keeps the stock model's width (0.541 m); the Playground model in its home pose
+is narrower (0.505 m, `python -m lpl_t1.measure playground`), so the hallway check stays
+conservative. Standing trunk height in the script's loop is 0.667 m, so nominal 0.67 m and
+fall 0.44 m are the same as stock.

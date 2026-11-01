@@ -13,15 +13,18 @@ import json
 import mujoco
 import numpy as np
 
-from lpl_t1.profiles import controller
+import sys
+
+from lpl_t1.profiles import controller, model_of
 from lpl_t1.scene import build
 
 
-def measure() -> dict:
-    scene = build()
+def measure(name: str = "stock") -> dict:
+    """Mesh extents in a configuration's initial pose on its own pinned model."""
+    scene = build(model=model_of(name))
     m = scene.model
     d = mujoco.MjData(m)
-    d.qpos[:] = controller("stock", scene).initial_qpos
+    d.qpos[:] = controller(name, scene).initial_qpos
     mujoco.mj_forward(m, d)
     pts = []
     for g in range(m.ngeom):
@@ -42,4 +45,4 @@ def measure() -> dict:
 
 
 if __name__ == "__main__":
-    print(json.dumps(measure(), indent=2))
+    print(json.dumps(measure(*sys.argv[1:2]), indent=2))

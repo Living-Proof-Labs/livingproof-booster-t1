@@ -22,7 +22,7 @@ def test_profiles_match_the_pinned_v1_5_0_schemas():
     assert pins["booster_gym"]["commit"] == PIN
     rob = robot()
     assert rob["id"] == "booster-t1" and rob["class"] == "humanoid"
-    assert [c["name"] for c in rob["configurations"]] == ["stock"]
+    assert [c["name"] for c in rob["configurations"]] == ["stock", "playground"]
     conf, digest = configuration("stock")
     assert digest == sha256(ROOT / "configurations/stock.json")
     assert conf["version"] == "1.0.0"

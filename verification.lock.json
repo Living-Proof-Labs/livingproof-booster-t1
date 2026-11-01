@@ -39,6 +39,12 @@
       "version": "1.0.0",
       "path": "configurations/stock.json",
       "sha256": "1cc5e5ed6e50f6b15d13e26a6c6b79b916c24ee407d755cd7d590141f8d2c92c"
+    },
+    {
+      "name": "playground",
+      "version": "1.0.0",
+      "path": "configurations/playground.json",
+      "sha256": "9644b36e5170f49fb86099b8ad856a455528c0b646599b248abc180914e9ed93"
     }
   ],
   "plan": {
