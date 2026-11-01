@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import json
 
-import mujoco
-import numpy as np
-
 import sys
+
+from livingproof_sim_mujoco.measure import extents, mesh_points
+import mujoco
 
 from lpl_t1.profiles import controller, model_of
 from lpl_t1.scene import build
@@ -26,15 +26,8 @@ def measure(name: str = "stock") -> dict:
     d = mujoco.MjData(m)
     d.qpos[:] = controller(name, scene).initial_qpos
     mujoco.mj_forward(m, d)
-    pts = []
-    for g in range(m.ngeom):
-        if m.geom_bodyid[g] == 0 or int(m.geom_type[g]) != int(mujoco.mjtGeom.mjGEOM_MESH):
-            continue
-        mid = m.geom_dataid[g]
-        v = m.mesh_vert[m.mesh_vertadr[mid] : m.mesh_vertadr[mid] + m.mesh_vertnum[mid]]
-        pts.append(d.geom_xpos[g] + v @ d.geom_xmat[g].reshape(3, 3).T)
-    p = np.vstack(pts)
-    ext = (p.max(0) - p.min(0)).round(3).tolist()
+    p = mesh_points(m, d)
+    ext = extents(p)
     return {
         "width_m": ext[1],
         "length_m": ext[0],
