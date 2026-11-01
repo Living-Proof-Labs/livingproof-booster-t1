@@ -1,21 +1,30 @@
 # livingproof-booster-t1
 
-Living Proof Labs robot package: Booster Robotics T1 humanoid. It pins an official model and a published, ready-made walking controller so the robot can be validated in the livingproof simulators (MuJoCo first, Gazebo where feasible) and in the [livingproof-worlds](https://github.com/Living-Proof-Labs/livingproof-worlds) test worlds.
+Living Proof Labs robot package: Booster Robotics T1 humanoid. It pins an official model and a published, ready-made walking controller so the robot can be validated in the livingproof simulators (MuJoCo first) and in the [livingproof-worlds](https://github.com/Living-Proof-Labs/livingproof-worlds) test worlds.
 
 Living Proof Labs does not train controllers. A robot is validated only with a walking controller or policy its maker or a maintained project has already published.
 
-**Status: stub.** The layout below is the plan; content comes next.
+## Sources (pinned in `pins.json`, downloaded and sha256-verified into `.cache/`, never vendored)
 
-## Planned layout
+| What | Upstream | License |
+|---|---|---|
+| Model `resources/T1/T1_locomotion.xml` + meshes | [BoosterRobotics/booster_gym](https://github.com/BoosterRobotics/booster_gym) @ `da396a0` | Apache-2.0 |
+| Policy `deploy/models/T1.pt` (TorchScript actor) | same commit | Apache-2.0 |
+| Training config `envs/T1.yaml`, loop `play_mujoco.py`, `export_model.py` | same commit | Apache-2.0 |
+| Profile schemas | robot-capability-specs v1.5.0 | Apache-2.0 |
+| World `hallway-open` 0.1.0 | livingproof-worlds v1.1.0 | Apache-2.0 |
 
-- `manifest.json`: one record with the fields `manufacturer`, `model`, `class` (humanoid or quadruped), `controller`, `source` and `license`, each pointing at an upstream release or commit.
-- **Pinned references, not vendored:** the model and controller are listed by URL, version or commit, and sha256. They are downloaded and checksum-verified at run time into an ignored folder.
-- **Per-simulator settings:** for example `simulators/mujoco/` and `simulators/gazebo/`, holding only what each engine needs (timestep, gains, control rate, observation mapping).
-- Tests that check the manifest and the pinned checksums.
+## Layout
 
-Planned sources: model from mujoco_menagerie `booster_t1`; controller from MuJoCo Playground `t1_policy.onnx` (Apache-2.0). Final pins are recorded in the manifest.
+- `robot.json`: robot profile (dimensions measured from the pinned model: `task profile:measure`).
+- `configurations/stock.json`: the published controller with the obs/action layout, PD gains, default pose and rates of `envs/T1.yaml`, exactly as `play_mujoco.py` uses them. No tuning.
+- `src/lpl_t1/publisher.py`: `play_mujoco.py`'s loop without the viewer, for reference checks.
+
+## Tasks
+
+`task setup`, `task check`, `task test`, `task profile:measure`, `task profile:stand`.
 
 ## Rules
 
-- No generated files are committed: no downloaded models or policies, no run output, no evidence. They are produced by tasks and published as CI artifacts or release assets.
-- Upstream licenses are recorded in the manifest and honoured. This repository's own code is Apache-2.0.
+- No generated files are committed: no downloaded models or policies, no run output, no evidence.
+- Upstream licenses are recorded in the profiles and honoured. This repository's own code is Apache-2.0.

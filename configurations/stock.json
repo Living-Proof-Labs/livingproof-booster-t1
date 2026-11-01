@@ -1,0 +1,141 @@
+{
+  "$comment": "Configuration profile (robot-capability-specs v1.5.0). settings.training copies the published booster_gym envs/T1.yaml values the MuJoCo loop (play_mujoco.py) reads; tests check them against the pinned upstream file. Nothing is tuned.",
+  "format": "livingproof-configuration-profile/0.1",
+  "robot": "booster-t1",
+  "name": "stock",
+  "version": "1.0.0",
+  "summary": "Booster Robotics' published booster_gym T1 walking policy (deploy/models/T1.pt) with the PD gains, default pose and rates of its training config envs/T1.yaml, as run by its play_mujoco.py.",
+  "controller": {
+    "publisher": "Booster Robotics",
+    "artifact": {
+      "repo": "https://github.com/BoosterRobotics/booster_gym",
+      "path": "deploy/models/T1.pt",
+      "commit": "da396a06d6eed99e2de72d7749c48ee8748950f9",
+      "sha256": "697cac61dbed2e76f25519c97ceb686f244d065dabf7d5d7ca386573143d215b",
+      "license": "Apache-2.0"
+    },
+    "format": "torchscript",
+    "interface": [
+      "velocity_command"
+    ],
+    "rate_hz": 50
+  },
+  "locomotion": {
+    "max_speed": {
+      "value": 1.0,
+      "unit": "m/s",
+      "source": "published",
+      "ref": "booster_gym envs/T1.yaml commands.lin_vel_x [-1, 1]"
+    },
+    "nominal_base_height": {
+      "value": 0.67,
+      "unit": "m",
+      "source": "measured",
+      "ref": "task profile:stand (publisher loop, zero command: trunk 0.667 m)"
+    },
+    "fall_base_height": {
+      "value": 0.44,
+      "unit": "m",
+      "source": "chosen",
+      "reason": "About two-thirds of the standing trunk height, the rule used for the G1."
+    }
+  },
+  "settings": {
+    "adapter": "booster_gym",
+    "training_config": {
+      "repo": "https://github.com/BoosterRobotics/booster_gym",
+      "path": "envs/T1.yaml",
+      "commit": "da396a06d6eed99e2de72d7749c48ee8748950f9",
+      "sha256": "9588982f4f8b460b151240e0012d0001b6e0024b132050f44acad2dd312bf60a",
+      "license": "Apache-2.0"
+    },
+    "reference": {
+      "repo": "https://github.com/BoosterRobotics/booster_gym",
+      "path": "play_mujoco.py",
+      "commit": "da396a06d6eed99e2de72d7749c48ee8748950f9",
+      "sha256": "69fc14a567b2977e77b416d485073d729cc5c08c1b6290d88ba1f158fa086402",
+      "license": "Apache-2.0"
+    },
+    "export": {
+      "repo": "https://github.com/BoosterRobotics/booster_gym",
+      "path": "export_model.py",
+      "commit": "da396a06d6eed99e2de72d7749c48ee8748950f9",
+      "sha256": "a03b3ee5956db9295ca5c3e7073e5c2baae966d16e24523b7f9059916a7207fb",
+      "license": "Apache-2.0"
+    },
+    "training": {
+      "sim": {
+        "dt": 0.002
+      },
+      "control": {
+        "stiffness": {
+          "Hip": 200.0,
+          "Knee": 200.0,
+          "Ankle": 50.0
+        },
+        "damping": {
+          "Hip": 5.0,
+          "Knee": 5.0,
+          "Ankle": 1.0
+        },
+        "action_scale": 1.0,
+        "decimation": 10
+      },
+      "init_state": {
+        "pos": [
+          0.0,
+          0.0,
+          0.72
+        ],
+        "rot": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "default_joint_angles": {
+          "Hip_Pitch": -0.2,
+          "Knee_Pitch": 0.4,
+          "Ankle_Pitch": -0.25,
+          "default": 0.0
+        }
+      },
+      "normalization": {
+        "gravity": 1.0,
+        "lin_vel": 1.0,
+        "ang_vel": 1.0,
+        "dof_pos": 1.0,
+        "dof_vel": 0.1,
+        "clip_actions": 1.0
+      },
+      "commands": {
+        "lin_vel_x": [
+          -1.0,
+          1.0
+        ],
+        "lin_vel_y": [
+          -1.0,
+          1.0
+        ],
+        "ang_vel_yaw": [
+          -1,
+          1
+        ],
+        "gait_frequency": [
+          1.0,
+          2.0
+        ]
+      }
+    },
+    "observation": {
+      "imu_site": "imu",
+      "orientation_sensor": "orientation",
+      "gyro_sensor": "angular-velocity",
+      "size": 47
+    },
+    "gait_note": "play_mujoco.py sets the gait frequency to the average of commands.gait_frequency (1.5 Hz) for any non-zero command and to 0 (phase terms zeroed) for a zero command. The runner's phase term is always on, so only non-zero commands are run.",
+    "action_note": "play_mujoco.py clips actions to +/- normalization.clip_actions (1.0) before targets and last_action; runner v1.4.0 does not clip. task reference measures whether any action reaches the limit.",
+    "deploy_note": "The real-robot deploy/configs/T1.yaml differs (ankle damping 3, gait_frequency 1); it is pinned for the record but not used: this configuration is the publisher's MuJoCo setup.",
+    "actuation": "pd_torque: every 0.002 s physics step runs mj_step1, writes kp (q* - q) - kd dq from current state into the model's <motor> actuators (ctrlrange = published torque limits, clamped by MuJoCo as play_mujoco.py clips), then mj_step2"
+  }
+}

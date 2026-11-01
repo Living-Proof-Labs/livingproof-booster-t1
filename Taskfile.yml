@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+version: '3'
+vars:
+  CONFIGURATION: '{{.CONFIGURATION | default "stock"}}'
+env:
+  MUJOCO_GL: osmesa
+  PYOPENGL_PLATFORM: osmesa
+tasks:
+  setup:
+    desc: Install dependencies (uv) and download the pinned upstream files
+    cmds:
+      - uv sync
+      - task: fetch
+  fetch:
+    desc: Download every pin in pins.json into .cache/ and verify its sha256
+    cmds: [uv run python -m lpl_t1.fetch]
+  check:
+    desc: Lint, formatting, and robot/configuration profiles against the pinned v1.5.0 schemas
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+      - 'uv run python -c "from lpl_t1.profiles import robot, configuration; [configuration(c[\"name\"]) for c in robot()[\"configurations\"]]; print(\"profiles valid\")"'
+  test:
+    desc: Schemas, pins, published values vs upstream, scene
+    cmds: [uv run pytest tests --junitxml=artifacts/tests.xml]
+  profile:measure:
+    desc: Measure robot width, length, height and mass from the pinned model (robot.json dimensions)
+    cmds: [uv run python -m lpl_t1.measure]
+  profile:stand:
+    desc: Zero-command standing trunk height in the publisher's play_mujoco.py loop
+    cmds: [uv run python -m lpl_t1.publisher stand]
