@@ -30,7 +30,7 @@ tasks:
     desc: Zero-command standing trunk height in the publisher's play_mujoco.py loop
     cmds: [uv run python -m lpl_t1.publisher stand]
   reference:
-    desc: Tick-by-tick match against booster_gym play_mujoco.py (T1.pt as the actor); exits 1 on FAIL
+    desc: Tick-by-tick match against booster_gym play_mujoco.py (fresh sensor reads, T1.pt as the actor); exits 1 on FAIL
     cmds: [uv run python -m lpl_t1.reference --ticks 500]
   evidence:
     desc: "walk-hallway sim evidence, no grading: task evidence [-- --allow-pending]"

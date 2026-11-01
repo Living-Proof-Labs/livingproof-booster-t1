@@ -1,16 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
 """Our runner against booster_gym's own control loop (play_mujoco.py), tick by tick.
 
-The reference is ``lpl_t1.publisher.play``: play_mujoco.py's loop verbatim apart from the
-constant command, no viewer, and the checkpoint swap documented there (T1.pt is
-``torch.jit.script(model.actor)``, so ``T1.pt(obs) == model.act(obs).loc`` exactly).
+The reference is ``lpl_t1.publisher.play`` with ``fresh_sensors=True``: play_mujoco.py's
+loop with two documented deviations, and otherwise verbatim (constant command, no viewer):
+
+1. Fresh sensor reads. play_mujoco.py reads ``orientation`` and ``angular-velocity`` right
+   after ``mj_step``, when they still hold values computed before that step's integration
+   (one 0.002 s physics step stale). The reference calls ``mj_forward`` before reading, so
+   gyro and gravity describe the current state, as the runner (and training) see them.
+2. T1.pt in place of the .pth checkpoint. play_mujoco.py evaluates
+   ``ActorCritic.act(obs).loc`` from a .pth that booster_gym does not publish; its
+   export_model.py saves ``torch.jit.script(model.actor)`` as T1.pt and ``act(obs).loc``
+   is ``actor(obs)``, so T1.pt is the same function.
+
 Both sides run the same pinned MJCF from the same initial state with the same command.
 
 Pass rule, as for the G1 stock controller: the same first policy step, and against the
-float64 reference identical actions and observations within 1e-12. The verbatim float32
-difference is reported, and two isolation variants show what any remaining difference
-comes from: ``fresh_sensors`` (play_mujoco.py reads sensors one physics step stale) and
-``no_clip`` (play_mujoco.py clips actions to +/-1; runner v1.4.0 does not).
+float64 reference identical actions and observations within 1e-12. The verbatim loop
+(stale reads, float32 and float64) is reported, not graded; ``no_clip`` shows the +/-1
+action clip (absent from runner v1.4.0) is never reached.
 
 The stand (zero command) is not compared: play_mujoco.py gates the phase off for a zero
 command and the runner's phase term cannot be gated, so only walking commands are run.
@@ -110,9 +118,11 @@ def passes(d: dict) -> bool:
 
 
 VARIANTS = {
-    "float64": {"dtype": np.float64},
-    "float64_fresh_sensors": {"dtype": np.float64, "fresh_sensors": True},
-    "float64_fresh_sensors_no_clip": {"dtype": np.float64, "fresh_sensors": True, "clip": False},
+    "float64": {"dtype": np.float64, "fresh_sensors": True},  # graded
+    "float32": {"fresh_sensors": True},
+    "float64_no_clip": {"dtype": np.float64, "fresh_sensors": True, "clip": False},
+    "verbatim_stale_float32": {},
+    "verbatim_stale_float64": {"dtype": np.float64},
 }
 
 
@@ -121,20 +131,23 @@ def run(command, ticks: int, root=ROOT) -> dict:
     keep = ("first_policy_step", "bit_exact", "first_divergence", "max_abs_diff")
     keep += ("max_obs_diff_by_term", "max_abs_action_reference", "final_base_xy")
     out = {}
-    for name, kw in {"float32_verbatim": {}, **VARIANTS}.items():
+    for name, kw in VARIANTS.items():
         ref, _, rq = play(command, steps, root, **kw)
         q0 = _initial_qpos(kw.get("dtype", np.float32), root)
         got, gq = ours(command, steps, q0, root)
         d = compare(ref, got, rq, gq)
         out[name] = {k: d[k] for k in keep} | {"ticks": d["ticks"], "passes_rule": passes(d)}
     return {
-        "reference": "play_mujoco.py loop + envs/T1.yaml @ booster_gym da396a0 (T1.pt as actor)",
+        "reference": (
+            "play_mujoco.py loop + envs/T1.yaml @ booster_gym da396a0, fresh sensor reads, "
+            "T1.pt as the actor"
+        ),
         "configuration": "stock",
         "configuration_sha256": configuration("stock", root)[1],
         "command": list(command),
         "pass_rule": (
             "same first policy step, and against the float64 reference identical actions and "
-            f"observations within {TOL:g}; the verbatim float32 difference is reported"
+            f"observations within {TOL:g}; the verbatim (stale-read) loop is reported, not graded"
         ),
         "passed": out["float64"]["passes_rule"],
         "variants": out,
