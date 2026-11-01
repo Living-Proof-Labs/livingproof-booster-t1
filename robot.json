@@ -1,0 +1,51 @@
+{
+  "$comment": "Robot profile (robot-capability-specs v1.5.0, specs/robots). model_source is booster_gym's MuJoCo model of the T1 (12 leg joints; head, arms and waist fixed to the trunk); its meshes are pinned in pins.json with every other upstream file.",
+  "format": "livingproof-robot-profile/0.1",
+  "id": "booster-t1",
+  "manufacturer": "Booster Robotics",
+  "model": "T1 (booster_gym locomotion model, 12 actuated leg joints)",
+  "class": "humanoid",
+  "model_source": {
+    "repo": "https://github.com/BoosterRobotics/booster_gym",
+    "path": "resources/T1/T1_locomotion.xml",
+    "commit": "da396a06d6eed99e2de72d7749c48ee8748950f9",
+    "sha256": "ac435ff179b1393294d41ee5dbc3d1161a6b9032e0a53fe2f4d693402dd4db36",
+    "license": "Apache-2.0 (booster_gym, model and meshes)"
+  },
+  "dimensions": {
+    "width": {
+      "value": 0.541,
+      "unit": "m",
+      "source": "measured",
+      "ref": "task profile:measure (mesh vertices at the published initial pose)"
+    },
+    "length": {
+      "value": 0.226,
+      "unit": "m",
+      "source": "measured",
+      "ref": "task profile:measure (mesh vertices at the published initial pose)"
+    },
+    "height": {
+      "value": 1.165,
+      "unit": "m",
+      "source": "measured",
+      "ref": "task profile:measure (mesh vertices at the published initial pose)"
+    },
+    "mass": {
+      "value": 31.61,
+      "unit": "kg",
+      "source": "measured",
+      "ref": "task profile:measure (sum of MJCF body masses)"
+    }
+  },
+  "configurations": [
+    {
+      "name": "stock",
+      "path": "configurations/stock.json"
+    }
+  ],
+  "default_configuration": "stock",
+  "simulators": [
+    "mujoco"
+  ]
+}

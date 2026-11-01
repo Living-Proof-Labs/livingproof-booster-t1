@@ -1,0 +1,194 @@
+{
+  "note": "Every download is fetched by commit and verified by sha256 into .cache/<group>/<path>. Nothing is vendored.",
+  "groups": {
+    "booster_gym": {
+      "repository": "BoosterRobotics/booster_gym",
+      "commit": "da396a06d6eed99e2de72d7749c48ee8748950f9",
+      "files": {
+        "LICENSE": {
+          "sha256": "e7c650725db8a696fc587cb7ec88b7685f81841f12002e2385b47d7e54e6c0d3",
+          "bytes": 916
+        },
+        "deploy/configs/T1.yaml": {
+          "sha256": "08382a8ac111c0a1f9ca26fa0801675ebb0c642ad03c027431f9c632558b6b41",
+          "bytes": 1406
+        },
+        "deploy/models/T1.pt": {
+          "sha256": "697cac61dbed2e76f25519c97ceb686f244d065dabf7d5d7ca386573143d215b",
+          "bytes": 263398
+        },
+        "envs/T1.yaml": {
+          "sha256": "9588982f4f8b460b151240e0012d0001b6e0024b132050f44acad2dd312bf60a",
+          "bytes": 7862
+        },
+        "export_model.py": {
+          "sha256": "a03b3ee5956db9295ca5c3e7073e5c2baae966d16e24523b7f9059916a7207fb",
+          "bytes": 1464
+        },
+        "play_mujoco.py": {
+          "sha256": "69fc14a567b2977e77b416d485073d729cc5c08c1b6290d88ba1f158fa086402",
+          "bytes": 6544
+        },
+        "resources/T1/T1_locomotion.xml": {
+          "sha256": "ac435ff179b1393294d41ee5dbc3d1161a6b9032e0a53fe2f4d693402dd4db36",
+          "bytes": 12946
+        },
+        "resources/T1/meshes/AL1.STL": {
+          "sha256": "43f5d268152b3c169d34731545ddfa2a510a7e16f209a2a80f8ba9ae0e1a40aa",
+          "bytes": 373884
+        },
+        "resources/T1/meshes/AL2.STL": {
+          "sha256": "4bca60adb29c73f701350abd23e8a8d660dc61e87c5163a80157650dd3ad88c3",
+          "bytes": 317584
+        },
+        "resources/T1/meshes/AL3.STL": {
+          "sha256": "bfdf5611dfe90f8e02b07b037c36a244f4ce7184b45113371ef46e624fb30854",
+          "bytes": 751184
+        },
+        "resources/T1/meshes/AR1.STL": {
+          "sha256": "6dbbd3dab4486600747be9d0e7f8523d67bf00d24d0dc9c23db1766c4d808fcf",
+          "bytes": 374984
+        },
+        "resources/T1/meshes/AR2.STL": {
+          "sha256": "0499136785fe1bc0289d9e503e1e0ea48f5a63420a2e45b0fcd9e6b3bcf8f999",
+          "bytes": 317584
+        },
+        "resources/T1/meshes/AR3.STL": {
+          "sha256": "92330bd8286fe420fb76949ee4c5d5bdec2e6bb30426acdc4d6fae9257464631",
+          "bytes": 751184
+        },
+        "resources/T1/meshes/Ankle_Cross_Left.STL": {
+          "sha256": "e6ec38741838475834c147f2ad18196c0254741e602c2b676f888fd12b5d7981",
+          "bytes": 59084
+        },
+        "resources/T1/meshes/Ankle_Cross_Right.STL": {
+          "sha256": "b15d91f0f2470fc4d5634db906a3d7efaf1f700302e6671824494da8faf50308",
+          "bytes": 59084
+        },
+        "resources/T1/meshes/H1.STL": {
+          "sha256": "527a2e426db4e3d476a195754764b7f9565a950b809a34e47618f177b139c3f2",
+          "bytes": 129084
+        },
+        "resources/T1/meshes/H2.STL": {
+          "sha256": "9cbf4fe83a721c809de65b1f0d0a379314f4523f7e2f8af7f0edc27c2ce385aa",
+          "bytes": 237184
+        },
+        "resources/T1/meshes/Hip_Pitch_Left.STL": {
+          "sha256": "7bcb8be569aeb5379cb75a0827d682bc1d73a52a7f515d3aeffece43842c33c9",
+          "bytes": 64584
+        },
+        "resources/T1/meshes/Hip_Pitch_Right.STL": {
+          "sha256": "054d579c3c6ccc1f97aaf1461d802dec748ce1bf26c6fdd289283a2d0dbb2032",
+          "bytes": 64184
+        },
+        "resources/T1/meshes/Hip_Roll_Left.STL": {
+          "sha256": "72dbd65bdb4e87444c8e538474f631d63bf8c0960922517456b8cf2be9e1d0f0",
+          "bytes": 57784
+        },
+        "resources/T1/meshes/Hip_Roll_Right.STL": {
+          "sha256": "d715a7649ea4bf20d7ee17b3a57bae31732e467b9da1053fee2242c90f50980f",
+          "bytes": 57784
+        },
+        "resources/T1/meshes/Hip_Yaw_Left.STL": {
+          "sha256": "d588e0467094811e74ae1962fcb0eb669f9b50b74022e96a738bdc8e807e03a7",
+          "bytes": 140684
+        },
+        "resources/T1/meshes/Hip_Yaw_Right.STL": {
+          "sha256": "5135f2fd5707364583d283e2fb21845054f3548c224f48e1f0a3d78ed3453497",
+          "bytes": 140684
+        },
+        "resources/T1/meshes/Shank_Left.STL": {
+          "sha256": "6ae8dd7f88cb70a4a3cb3972cad4035a76f1604fd73ea66e285da553b3703c40",
+          "bytes": 492684
+        },
+        "resources/T1/meshes/Shank_Right.STL": {
+          "sha256": "dc66a8a0e2e31e413884a053e427d9b5007bef4508986587916a638a8a448599",
+          "bytes": 493284
+        },
+        "resources/T1/meshes/Trunk.STL": {
+          "sha256": "39d9610b23ef8ac7ea4343231a499f9c485903bede62df9729a2cd1254fede8f",
+          "bytes": 329384
+        },
+        "resources/T1/meshes/Waist.STL": {
+          "sha256": "2fe0a9ccfc284beca402e554db38e83022592192afa00f02db13cb374ffe9fbc",
+          "bytes": 388684
+        },
+        "resources/T1/meshes/left_foot_link.STL": {
+          "sha256": "82d653e30c0ae2e588c3c539266c9a1fee20e711448e13598f25384c7dc562ca",
+          "bytes": 979684
+        },
+        "resources/T1/meshes/left_hand_link.STL": {
+          "sha256": "34df992aed438446481cfa20e78327810cd5cc5ecbb4a6f32ba2bf625462f53d",
+          "bytes": 435884
+        },
+        "resources/T1/meshes/right_foot_link.STL": {
+          "sha256": "78440aa4bab7c397b8e507431b44b814e4cb89db0d03455f83ae54e3157cf15b",
+          "bytes": 979684
+        },
+        "resources/T1/meshes/right_hand_link.STL": {
+          "sha256": "c5a73e493e17db7611a81785f80c01167f51018271b4042f72fa8d2351d8b0eb",
+          "bytes": 435284
+        },
+        "utils/model.py": {
+          "sha256": "babcf81c4f7c23654bfa0af0455e3f600df4abdc326ae0b9b9cb85806073fec8",
+          "bytes": 1264
+        }
+      },
+      "dest": ".cache/booster_gym",
+      "note": "Apache-2.0 (c) Booster Robotics. T1.pt (TorchScript actor), the MuJoCo model with its meshes, the training config and play_mujoco.py, all from one commit."
+    },
+    "worlds": {
+      "repository": "Living-Proof-Labs/livingproof-worlds",
+      "commit": "9b3e7119aa93a3370383227fb30bd39a9dd72b4b",
+      "files": {
+        "worlds/hallway-open/0.1.0/world.json": {
+          "sha256": "d60bb8aa6a72c8403fb6674cc9d803962c1484bc3e163527988e8c57ccec775c",
+          "bytes": 2380
+        }
+      },
+      "dest": ".cache/worlds",
+      "tag": "v1.1.0"
+    },
+    "specs": {
+      "repository": "Living-Proof-Labs/robot-capability-specs",
+      "tag": "v1.5.0",
+      "commit": "1df6eaa4a194315da51e5d2b05cee8073fc7389b",
+      "dest": ".cache/specs",
+      "note": "Schemas and the walk-hallway scenario (#22 merged as 1df6eaa, released as v1.5.0).",
+      "files": {
+        "specs/robots/robot-profile.schema.json": {
+          "sha256": "90a02a6b9371cd81b6a5e07cdafeda02727f36c5e17ba9777a9a09807a5d5226",
+          "bytes": 3241
+        },
+        "specs/robots/configuration-profile.schema.json": {
+          "sha256": "3208a2ca0b852eb9e0654c5e56d95195f1f887428e70a06514f44f96aab81bf0",
+          "bytes": 2340
+        },
+        "specs/robots/run-manifest.schema.json": {
+          "sha256": "00730f3be81f2c96a3a7a01c8c98e60048729b6fae8c2e7ad0f05506be107e50",
+          "bytes": 3287
+        },
+        "specs/robots/README.md": {
+          "sha256": "6b3d36ebcbfbe3fb91e225a5d82cd83aab7afd1305e936804e86ccb7071d9b59",
+          "bytes": 5092
+        },
+        "specs/scenarios/walk-hallway/README.md": {
+          "sha256": "d89cb65625895b80b1c319f0802ee42bda7c413fabdfc3b6686d6627e7c2e6c0",
+          "bytes": 4998
+        },
+        "specs/scenarios/walk-hallway/walk-hallway.feature": {
+          "sha256": "1d62f9a5da5f2e8fc3255495d207138eb8b6e7e12dbc45757c8d430326cc05db",
+          "bytes": 1527
+        },
+        "specs/scenarios/walk-hallway/compare-configurations.feature": {
+          "sha256": "c0874feb01602e3e134ab01104abe9d050642aba427c80205ffadc016a39ee08",
+          "bytes": 1610
+        },
+        "LICENSES/CC-BY-4.0.txt": {
+          "sha256": "d557539df68e771cc1eedcc91d13f70fca930e508d11eedcafa4b15db49e3744",
+          "bytes": 17023
+        }
+      }
+    }
+  }
+}
