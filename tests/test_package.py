@@ -155,8 +155,24 @@ def test_scenario_parameters_follow_the_pinned_acceptance_table():
         assert row in text, row
     p = sc.parameters("stock")
     assert (p["time_limit"], p["exit_x"], p["fall_height"]) == (27.0, 3.0, 0.44)
+    assert "0.05 m humanoid" in text and p["wall_clearance"] == 0.05
+    width = robot()["dimensions"]["width"]["value"]
+    assert p["lateral_limit"] == pytest.approx(1.5 / 2 - width / 2) == pytest.approx(0.4795)
+    pre = {c["name"]: c for c in sc.preconditions("stock")}
+    assert all(c["met"] for c in pre.values()), pre
+    assert width + 2 * 0.05 <= 1.5 and "0.641 m vs 1.5 m" in pre["fits_width"]["detail"]
     pre = {c["name"]: c["met"] for c in sc.preconditions("vendor-x")}
     assert pre["configuration_offered"] is False
+
+
+def test_a_robot_too_wide_for_the_hallway_is_unsupported(tmp_path, monkeypatch):
+    from lpl_t1 import scenario as sc
+
+    wide = robot()
+    wide["dimensions"]["width"]["value"] = 1.41
+    monkeypatch.setattr(sc, "robot", lambda root=ROOT: wide)
+    pre = {c["name"]: c["met"] for c in sc.preconditions("stock")}
+    assert pre["fits_width"] is False
 
 
 def test_seed_noise_is_deterministic_and_starts_at_the_spawn():

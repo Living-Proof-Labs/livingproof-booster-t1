@@ -28,3 +28,14 @@ Living Proof Labs does not train controllers. A robot is validated only with a w
 
 - No generated files are committed: no downloaded models or policies, no run output, no evidence.
 - Upstream licenses are recorded in the profiles and honoured. This repository's own code is Apache-2.0.
+
+## walk-hallway@0.1.0 (hallway-open 0.1.0, clear width 1.5 m)
+
+| Parameter | T1 | How |
+|---|---|---|
+| `lateral_limit` | 0.4795 m | 1.5 / 2 - 0.541 / 2, the G1 rule (G1: 0.49 m) |
+| `wall_clearance` | 0.05 m | humanoid |
+| `fits_width` | met | 0.541 + 2 x 0.05 = 0.641 m <= 1.5 m, so the T1 is supported |
+| `fall_height` | 0.44 m | about 2/3 of the 0.667 m standing trunk height |
+
+`task evidence` records 20 seeded trials (seeds 1-20, 0.5 m/s) for the capability verifier; grading is done there and by the capability report, never here. `task reference` compares the runner with `play_mujoco.py`.
