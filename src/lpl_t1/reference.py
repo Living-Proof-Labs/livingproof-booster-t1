@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Our runner against booster_gym's own control loop (play_mujoco.py), tick by tick.
 
-The reference is ``lpl_t1.publisher.play`` with ``fresh_sensors=True``: play_mujoco.py's
-loop with two documented deviations, and otherwise verbatim (constant command, no viewer):
+The reference is ``lpl_t1.publisher.play`` with ``fresh_sensors=True`` and
+``runner_phase=True``: play_mujoco.py's loop with three documented deviations, and
+otherwise verbatim (constant command, no viewer):
 
 1. Fresh sensor reads. play_mujoco.py reads ``orientation`` and ``angular-velocity`` right
    after ``mj_step``, when they still hold values computed before that step's integration
@@ -12,14 +13,13 @@ loop with two documented deviations, and otherwise verbatim (constant command, n
    ``ActorCritic.act(obs).loc`` from a .pth that booster_gym does not publish; its
    export_model.py saves ``torch.jit.script(model.actor)`` as T1.pt and ``act(obs).loc``
    is ``actor(obs)``, so T1.pt is the same function.
-
-Both sides run the same pinned MJCF from the same initial state with the same command.
-
 3. Phase arithmetic: play_mujoco.py accumulates the gait phase as a fraction every physics
    step (``fmod(gp + dt f, 1)``, read as cos/sin of ``2 pi gp``); the runner advances it in
    radians once per policy step (``fmod(phase + 2 pi f 10 dt + pi, 2 pi) - pi``). The same
    phase, rounded differently (~2e-14 over 100 ticks). The graded reference uses the runner's
    arithmetic, so no tolerance is needed; the publisher's is reported.
+
+Both sides run the same pinned MJCF from the same initial state with the same command.
 
 Pass rule: the same first policy step, and against the float64 reference observations and
 actions exactly equal (``==``). The verbatim loop

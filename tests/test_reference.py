@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Exact match against booster_gym's play_mujoco.py loop (lpl_t1.reference).
 
-The reference is play_mujoco.py with two documented deviations:
+The reference is play_mujoco.py with three documented deviations:
 
 1. Fresh sensor reads: play_mujoco.py reads the orientation and gyro sensors right after
    mj_step, i.e. values computed before that step's integration (one 0.002 s physics step
