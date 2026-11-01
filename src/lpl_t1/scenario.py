@@ -14,6 +14,7 @@ from lpl_t1.scene import load_world
 
 SCENARIO = "walk-hallway@0.1.0"
 COMMAND_SPEED = 0.5  # m/s, shared
+WALL_CLEARANCE = {"humanoid": 0.05, "quadruped": 0.10}  # m, walk-hallway README
 SPAWN, EXIT = "spawn-entrance", "exit"
 
 
@@ -23,14 +24,19 @@ def place(world: dict, name: str) -> dict:
 
 def parameters(name: str, root: Path = ROOT) -> dict:
     """Acceptance parameters resolved from the scenario, robot, configuration and world."""
-    conf, _ = configuration(name, root)
+    rob, (conf, _) = robot(root), configuration(name, root)
     world = load_world(root)
+    clear = world["dimensions"]["clear_width"]
+    width = rob["dimensions"]["width"]["value"]
     route = place(world, EXIT)["reference"][0] - place(world, SPAWN)["position"][0]
     return {
         "command_speed": COMMAND_SPEED,
         "route_length": route,
         "time_limit": 2 * route / COMMAND_SPEED + 5,
         "fall_height": conf["locomotion"]["fall_base_height"]["value"],
+        "wall_clearance": WALL_CLEARANCE[rob["class"]],
+        # half the clear width less half the robot width, the G1 rule (G1: 0.49 m)
+        "lateral_limit": round(clear / 2 - width / 2, 6),
         "exit_x": place(world, EXIT)["reference"][0],
         "spawn": SPAWN,
     }
@@ -39,7 +45,11 @@ def parameters(name: str, root: Path = ROOT) -> dict:
 def preconditions(name: str, root: Path = ROOT) -> list[dict]:
     """Checked before any trial and recorded in the evidence manifest."""
     rob = robot(root)
-    out = []
+    world = load_world(root)
+    width = rob["dimensions"]["width"]["value"]
+    clear = world["dimensions"]["clear_width"]
+    need = width + 2 * WALL_CLEARANCE[rob["class"]]
+    out = [("fits_width", need <= clear, f"{width} + 2 x clearance = {need:.3f} m vs {clear} m")]
     try:
         conf, _ = configuration(name, root)
         out.append(("configuration_offered", True, name))
