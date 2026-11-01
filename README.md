@@ -32,7 +32,7 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.de
 
 ## Tasks
 
-`task setup`, `task check`, `task test`, `task profile:measure`, `task profile:stand`.
+`uv sync`, `uv run python -m lpl_t1.fetch`, `uv run pytest tests` (CI: capability-verifier's walk-hallway `check` job), `task profile:measure`, `task profile:stand`.
 
 ## Rules
 
@@ -48,7 +48,7 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.de
 | `fits_width` | met | 0.541 + 2 x 0.05 = 0.641 m <= 1.5 m, so the T1 is supported |
 | `fall_height` | 0.44 m | about 2/3 of the 0.667 m standing trunk height |
 
-`task evidence` records 20 seeded trials (seeds 1-20, 0.5 m/s) for the capability verifier; grading is done there and by the capability report, never here. `task reference` compares the runner with `play_mujoco.py`.
+`python -m lpl_t1.evidence` records 20 seeded trials (seeds 1-20, 0.5 m/s) for the capability verifier; grading is done there and by the capability report, never here. `task reference` compares the runner with `play_mujoco.py`.
 
 ## Configuration `playground` (1.0.0)
 
