@@ -116,6 +116,8 @@ def controller(name: str, scene: Scene, root: Path = ROOT) -> Controller:
     in actuator order."""
     conf, digest = configuration(name, root)
     s = conf["settings"]
+    if s["adapter"] == "playground_joystick":
+        return _playground(conf, digest, scene, root)
     if s["adapter"] != "booster_gym":
         raise ValueError(f"unknown adapter {s['adapter']!r}")
     path = artifact_path(conf["controller"]["artifact"], root)
@@ -156,6 +158,55 @@ def controller(name: str, scene: Scene, root: Path = ROOT) -> Controller:
     qpos[3:7] = [rot[3], *rot[0:3]]
     for j, q in zip(joints, default):
         qpos[model.joint(j).qposadr[0]] = q
+    return Controller(conf, digest, path, spec, qpos)
+
+
+def model_of(name: str, root: Path = ROOT) -> str:
+    """Which pinned model a configuration runs on (scene.MODELS key)."""
+    return configuration(name, root)[0]["settings"].get("model", "booster_gym")
+
+
+def _playground(conf: dict, digest: str, scene: Scene, root: Path) -> Controller:
+    """play_t1_joystick.py's OnnxController as a runner spec, on the MJCF <position>
+    actuators. Observation (85): local linvel, gyro, gravity (imu frame), command,
+    q - default and dq with the two head joints zeroed, last action, cos/sin of the two
+    foot phases. The first action is in physics step 9 (counter += 1 before the check)."""
+    s = conf["settings"]
+    path = artifact_path(conf["controller"]["artifact"], root)
+    model = scene.model
+    key = model.key(s["initial_keyframe"]).id
+    qpos = model.key_qpos[key].copy()
+    actuators = [model.actuator(i).name for i in range(model.nu)]
+    joints = [model.joint(model.actuator_trnid[i][0]).name for i in range(model.nu)]
+    adr = [int(model.joint(j).qposadr[0]) for j in joints]
+    if adr != list(range(7, model.nq)):
+        raise ValueError("actuator order is not qpos[7:] order; play_t1_joystick indexes qpos[7:]")
+    mask = [0.0 if j in s["observation"]["zeroed_joints"] else 1.0 for j in joints]
+    o = s["observation"]
+    decimation = round(s["ctrl_dt_s"] / float(model.opt.timestep))
+    spec = PolicySpec(
+        joints=joints,
+        actuators=actuators,
+        default_pose=[float(qpos[a]) for a in adr],
+        action_scale=s["action_scale"],
+        decimation=decimation,
+        first_tick=decimation - 1,
+        obs=[
+            ObsTerm("sensor", o["linvel_sensor"]),
+            ObsTerm("sensor", o["gyro_sensor"]),
+            ObsTerm("gravity", o["imu_site"]),
+            ObsTerm("command"),
+            ObsTerm("joint_pos", scale=mask),
+            ObsTerm("joint_vel", scale=mask),
+            ObsTerm("last_action"),
+            ObsTerm("phase"),
+        ],
+        gait_hz=s["gait_hz"],
+        gait_offsets=s["gait_offsets_rad"],
+        phase_order="cos_sin",
+        actuation="position",
+    )
+    qpos[0:2] = 0.0
     return Controller(conf, digest, path, spec, qpos)
 
 

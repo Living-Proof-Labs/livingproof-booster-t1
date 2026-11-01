@@ -42,6 +42,10 @@
     {
       "name": "stock",
       "path": "configurations/stock.json"
+    },
+    {
+      "name": "playground",
+      "path": "configurations/playground.json"
     }
   ],
   "default_configuration": "stock",

@@ -25,7 +25,7 @@ import mujoco
 from lpl_t1 import ROOT
 from lpl_t1 import scenario as sc
 from lpl_t1.fetch import fetch, sha256
-from lpl_t1.profiles import controller
+from lpl_t1.profiles import controller, model_of
 from lpl_t1.scene import BASE_BODY, build, load_world
 from lpl_t1.walk import initial_state, runner_settings
 
@@ -65,7 +65,7 @@ def _trial(args):
 
     name, seed, plan, p, out = args
     rs = runner_settings(ROOT)
-    scene = build(ROOT)
+    scene = build(ROOT, model_of(name, ROOT))
     model = scene.model
     ctrl = controller(name, scene, ROOT)
     policy = OnnxPolicy(model, ctrl.policy_path, ctrl.spec)
@@ -139,7 +139,8 @@ def evidence(name: str, out: Path, *, jobs: int | None = None, allow_pending=Fal
                 "commit": lock["releases"]["runner"]["commit"],
             },
             "base_body": BASE_BODY,
-            "walls": build(ROOT).walls,
+            "walls": build(ROOT, model_of(name)).walls,
+            "model": model_of(name),
             "source_commit": sc.git_head(ROOT)[0],
         },
         "trials": sorted(trials, key=lambda t: t["seed"]),

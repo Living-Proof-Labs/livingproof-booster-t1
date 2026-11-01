@@ -26,6 +26,12 @@ tasks:
   profile:measure:
     desc: Measure robot width, length, height and mass from the pinned model (robot.json dimensions)
     cmds: [uv run python -m lpl_t1.measure]
+  reference:playground:
+    desc: Runner vs play_t1_joystick.py's loop (mujoco_playground 12ad7f3), 500 ticks
+    cmds: [uv run python -m lpl_t1.playground_reference]
+  profile:stand:playground:
+    desc: Zero-command standing trunk height in play_t1_joystick.py's loop
+    cmds: [uv run python -m lpl_t1.playground_reference --stand]
   profile:stand:
     desc: Zero-command standing trunk height in the publisher's play_mujoco.py loop
     cmds: [uv run python -m lpl_t1.publisher stand]

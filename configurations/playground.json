@@ -1,0 +1,96 @@
+{
+  "$comment": "Configuration profile (robot-capability-specs v1.5.0). Every value is MuJoCo Playground's play_t1_joystick.py / t1_mjx_feetonly.xml at the pinned commit; tests check them against the pinned upstream files. Nothing is tuned.",
+  "format": "livingproof-configuration-profile/0.1",
+  "robot": "booster-t1",
+  "name": "playground",
+  "version": "1.0.0",
+  "summary": "Google DeepMind MuJoCo Playground's T1 joystick policy (experimental/sim2sim/onnx/t1_policy.onnx) on Playground's own T1 MJCF <position> actuators, with the observation, default pose (keyframe home) and rates of play_t1_joystick.py.",
+  "controller": {
+    "publisher": "Google DeepMind (MuJoCo Playground)",
+    "artifact": {
+      "repo": "https://github.com/google-deepmind/mujoco_playground",
+      "path": "mujoco_playground/experimental/sim2sim/onnx/t1_policy.onnx",
+      "commit": "12ad7f3842791ced39f27e5ac96d066bbe361653",
+      "sha256": "3f25f2b9c3dd49bab915577f7d5caba4e753a6cb29df2d7488ef7da14d1966b4",
+      "license": "Apache-2.0"
+    },
+    "format": "onnx",
+    "interface": [
+      "velocity_command"
+    ],
+    "rate_hz": 50
+  },
+  "locomotion": {
+    "max_speed": {
+      "value": 1.0,
+      "unit": "m/s",
+      "source": "published",
+      "ref": "mujoco_playground t1/joystick.py default_config lin_vel_x [-1, 1]"
+    },
+    "nominal_base_height": {
+      "value": 0.67,
+      "unit": "m",
+      "source": "measured",
+      "ref": "task profile:stand:playground (play_t1_joystick.py loop, zero command, 10 s: trunk 0.667 m)"
+    },
+    "fall_base_height": {
+      "value": 0.44,
+      "unit": "m",
+      "source": "chosen",
+      "reason": "About two-thirds of the standing trunk height, the rule used for stock and the G1."
+    }
+  },
+  "settings": {
+    "adapter": "playground_joystick",
+    "model": "playground",
+    "reference": {
+      "repo": "https://github.com/google-deepmind/mujoco_playground",
+      "path": "mujoco_playground/experimental/sim2sim/play_t1_joystick.py",
+      "commit": "12ad7f3842791ced39f27e5ac96d066bbe361653",
+      "sha256": "a0de562254e1b244fb99ab52db3867b7142b0e10dc2cd5d21b4054fd65427df5",
+      "license": "Apache-2.0"
+    },
+    "scene": {
+      "repo": "https://github.com/google-deepmind/mujoco_playground",
+      "path": "mujoco_playground/_src/locomotion/t1/xmls/scene_mjx_feetonly_flat_terrain.xml",
+      "commit": "12ad7f3842791ced39f27e5ac96d066bbe361653",
+      "sha256": "55d59aa255dc415be422f7ec376dad2b302913977989dbffe8a0ee3721409ea7",
+      "license": "Apache-2.0"
+    },
+    "robot_mjcf": {
+      "repo": "https://github.com/google-deepmind/mujoco_playground",
+      "path": "mujoco_playground/_src/locomotion/t1/xmls/t1_mjx_feetonly.xml",
+      "commit": "12ad7f3842791ced39f27e5ac96d066bbe361653",
+      "sha256": "ef66de5286b480342a2795bdf7fc8cc837293fafe714cda117cc3a7e49e41a7a",
+      "license": "Apache-2.0"
+    },
+    "meshes": {
+      "repo": "https://github.com/google-deepmind/mujoco_menagerie",
+      "path": "booster_t1/assets",
+      "commit": "1b86ece576591213e2b666ebf59508454200ca97",
+      "license": "Apache-2.0"
+    },
+    "ctrl_dt_s": 0.02,
+    "sim_dt_s": 0.002,
+    "action_scale": 1.0,
+    "gait_hz": 1.5,
+    "gait_offsets_rad": [
+      0.0,
+      3.141592653589793
+    ],
+    "initial_keyframe": "home",
+    "observation": {
+      "linvel_sensor": "local_linvel",
+      "gyro_sensor": "gyro",
+      "imu_site": "imu",
+      "zeroed_joints": [
+        "AAHead_yaw",
+        "Head_pitch"
+      ],
+      "size": 85
+    },
+    "scene_note": "play_t1_joystick.py loads the rough-terrain scene (heightfield floor, keyframe z 0.72). The hallway floor is flat, so this configuration uses Playground's flat-terrain scene of the same robot MJCF (plane floor, keyframe home z 0.665), as the G1 playground configuration does. The robot MJCF, actuators and gains are unchanged.",
+    "command_note": "play_t1_joystick.py's vel_scale_x/y/rot (1, 0.8, 1) only scale gamepad input; the runner passes the command directly. Its phase is pi for |command| < 0.01; only non-zero commands are run.",
+    "actuation": "position: the MJCF's own <position> actuators (kp from its default classes, joint damping/armature as published); ctrl = action * 1.0 + keyframe home qpos[7:], once per 10 physics steps, first in physics step 9"
+  }
+}
