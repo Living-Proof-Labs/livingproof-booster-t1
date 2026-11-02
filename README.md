@@ -48,7 +48,7 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.de
 | `fits_width` | met | 0.541 + 2 x 0.05 = 0.641 m <= 1.5 m, so the T1 is supported |
 | `fall_height` | 0.44 m | about 2/3 of the 0.667 m standing trunk height |
 
-`uv run python -m lpl_t1.evidence CONFIGURATION OUT [--jobs N] [--allow-pending]` records 20 seeded trials (seeds 1-20, 0.5 m/s) for the capability verifier, for example `uv run python -m lpl_t1.evidence stock artifacts/evidence/stock`. CONFIGURATION is `stock` or `playground`; `--allow-pending` is for local runs before the pinned releases exist. Grading is done by the capability verifier and the capability report, never here. `task reference` compares the runner with `play_mujoco.py`.
+`uv run python -m lpl_t1.evidence CONFIGURATION OUT [--jobs N] [--allow-pending]` records 20 seeded trials (seeds 1-20, 0.5 m/s) for the capability verifier, for example `uv run python -m lpl_t1.evidence stock artifacts/evidence/stock`. CONFIGURATION is `stock` or `playground`; `--allow-pending` is for local runs before the pinned releases exist. The capability verifier grades the trials and the capability report only renders that stored grade; nothing is graded here. `task reference` compares the runner with `play_mujoco.py`.
 
 ## Configuration `playground` (1.0.0)
 
