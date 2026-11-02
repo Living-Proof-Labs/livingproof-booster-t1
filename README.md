@@ -28,11 +28,11 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.de
 
 ## Reference check
 
-`task reference` compares runner v1.4.0 with `play_mujoco.py`'s loop tick by tick and requires observations and actions to be exactly equal (`==`). The reference reads sensors fresh, uses T1.pt for the unpublished .pth, and advances the gait phase with the runner's arithmetic; each deviation is documented in `lpl_t1/reference.py`. Tests also check that a 1-ULP change is detected and that three runs are bit-identical.
+`task reference` compares runner v1.8.1 (the tag pinned in `verification.lock.json`) with `play_mujoco.py`'s loop tick by tick and requires observations and actions to be exactly equal (`==`). The reference reads sensors fresh, uses T1.pt for the unpublished .pth, and advances the gait phase with the runner's arithmetic; each deviation is documented in `src/lpl_t1/reference.py`. Tests also check that a 1-ULP change is detected and that three runs are bit-identical.
 
 ## Tasks
 
-`uv sync`, `uv run pytest tests`, `uv run pytest tests` (CI: capability-verifier's walk-hallway `check` job), `task profile:measure`, `task profile:stand`.
+`uv sync`, `uv run pytest tests` (CI: capability-verifier's walk-hallway `check` job), `task profile:measure`, `task profile:stand`.
 
 ## Rules
 
@@ -48,7 +48,7 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.de
 | `fits_width` | met | 0.541 + 2 x 0.05 = 0.641 m <= 1.5 m, so the T1 is supported |
 | `fall_height` | 0.44 m | about 2/3 of the 0.667 m standing trunk height |
 
-`python -m lpl_t1.evidence` records 20 seeded trials (seeds 1-20, 0.5 m/s) for the capability verifier; grading is done there and by the capability report, never here. `task reference` compares the runner with `play_mujoco.py`.
+`uv run python -m lpl_t1.evidence CONFIGURATION OUT [--jobs N] [--allow-pending]` records 20 seeded trials (seeds 1-20, 0.5 m/s) for the capability verifier, for example `uv run python -m lpl_t1.evidence stock artifacts/evidence/stock`. CONFIGURATION is `stock` or `playground`; `--allow-pending` is for local runs before the pinned releases exist. Grading is done by the capability verifier and the capability report, never here. `task reference` compares the runner with `play_mujoco.py`.
 
 ## Configuration `playground` (1.0.0)
 
@@ -60,7 +60,7 @@ Nothing is tuned. `task reference:playground` compares the runner with the scrip
 `OnnxController` loop tick by tick.
 
 Deviations from the script, both documented in `configurations/playground.json` and
-`lpl_t1/playground_reference.py`:
+`src/lpl_t1/playground_reference.py`:
 
 1. Flat-terrain scene instead of the rough heightfield the script loads (the hallway is flat).
 2. The script's `joint_velocities = data.qvel[6:]` is a view, so `joint_velocities[:2] *= 0`
