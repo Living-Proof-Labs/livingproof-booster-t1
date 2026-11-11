@@ -31,10 +31,10 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
-# The runner, pinned to the release tag in verification.lock.json releases.runner (v2.0.1).
+# The runner, pinned to the release tag in verification.lock.json releases.runner (v2.0.3).
 # `task repin -- runner=vX.Y.Z` rewrites this tag and the lock's releases.runner tag and
 # commit, then `uv lock`.
-livingproof-sim-mujoco = { git = "https://github.com/Living-Proof-Labs/livingproof-sim-mujoco.git", tag = "v2.0.1" }
+livingproof-sim-mujoco = { git = "https://github.com/Living-Proof-Labs/livingproof-sim-mujoco.git", tag = "v2.0.3" }
 
 [tool.pytest.ini_options]
 addopts = "-ra"
