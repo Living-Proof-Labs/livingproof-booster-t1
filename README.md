@@ -28,7 +28,7 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.de
 
 ## Reference check
 
-`task reference` compares runner v2.0.0 (the tag pinned in `verification.lock.json`) with `play_mujoco.py`'s loop tick by tick and requires observations and actions to be exactly equal (`==`). The reference reads sensors fresh, uses T1.pt for the unpublished .pth, and advances the gait phase with the runner's arithmetic; each deviation is documented in `src/lpl_t1/reference.py`. Tests also check that a 1-ULP change is detected and that three runs are bit-identical. Trials start at the exact nominal pose. There is no seed and no noise.
+`task reference` compares runner v2.0.1 (the tag pinned in `verification.lock.json`) with `play_mujoco.py`'s loop tick by tick and requires observations and actions to be exactly equal (`==`). The reference reads sensors fresh, uses T1.pt for the unpublished .pth, and advances the gait phase with the runner's arithmetic; each deviation is documented in `src/lpl_t1/reference.py`. Tests also check that a 1-ULP change is detected and that three runs are bit-identical. Trials start at the exact nominal pose. There is no seed and no noise.
 
 ## Tasks
 
@@ -54,9 +54,9 @@ The specification's default count is 1. This package uses 3 so a published run c
 
 `uv run python -m livingproof_sim_mujoco.evidence lpl_t1.adapter:ROBOT CONFIGURATION OUT` records `trials.count` identical trials (0.5 m/s) for the capability verifier, for example `uv run python -m livingproof_sim_mujoco.evidence lpl_t1.adapter:ROBOT stock artifacts/evidence/stock`. CONFIGURATION is `stock` or `playground`. It writes `trials/trial-NN.json` and a `livingproof-hallway-evidence/2.0.0` manifest, plus a `livingproof-run-manifest/0.1` before the first trial. Exit 4 means the identical trials disagreed (a test-system reproducibility finding, not a robot grade). `--allow-pending` is for local runs before the pinned releases exist. The capability verifier grades the trials and the capability report only renders that stored grade; nothing is graded here. `task reference` compares the runner with `play_mujoco.py`.
 
-Every release ref in `verification.lock.json` is currently pinned (specs v2.0.2, runner v2.0.0, verifier v1.16.0, reporter v3.0.4). Evidence goes to `artifacts/evidence/<configuration>/` (`manifest.json`, `run-manifest.json`, `trials/trial-NN.json`). Artifacts are never committed.
+Every release ref in `verification.lock.json` is currently pinned (specs v2.0.2, runner v2.0.1, verifier v1.16.1, reporter v3.0.4). Evidence goes to `artifacts/evidence/<configuration>/` (`manifest.json`, `run-manifest.json`, `trials/trial-NN.json`). Artifacts are never committed.
 
-The next runner pin, sim-mujoco v2.0.1, is the pyproject tag on the `livingproof-sim-mujoco` source (`tag = "v2.0.0"`), `verification.lock.json` `releases.runner.tag` and `releases.runner.commit`, then `uv lock`. v2.0.1 is not released yet.
+The runner pin is sim-mujoco v2.0.1 (`5f6b9d10962eb6108dc55b079806b7a3cf794de7`): the pyproject tag on the `livingproof-sim-mujoco` source (`tag = "v2.0.1"`), `verification.lock.json` `releases.runner.tag` and `releases.runner.commit`. `task repin -- runner=vX.Y.Z` rewrites that tag and the lock, then `uv lock`. The verifier pin is capability-verifier v1.16.1 (`67bb6bbc330645f9fee66b9ab16f6c055cd313f8`), including `releases.verifier` and the `walk-hallway.yml` ref.
 
 ## Configuration `playground` (1.0.0)
 
