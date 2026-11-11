@@ -66,7 +66,7 @@ def play(
 ):
     """Run ``steps`` physics steps. Returns (policy log [(it, obs, action)], base heights
     per step, final qpos). ``qpos0``/``qvel0`` override the initial state after the loop's
-    own setup (used for seeded starts).
+    own setup (an explicit start).
 
     ``runner_phase`` computes the gait phase as runner v1.4.0 does: radians, advanced once
     per policy step after the action by ``fmod(phase + 2 pi f decimation dt + pi, 2 pi) - pi``

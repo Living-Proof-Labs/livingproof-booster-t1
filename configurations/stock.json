@@ -1,5 +1,5 @@
 {
-  "$comment": "Configuration profile (robot-capability-specs v1.5.0). settings.training copies the published booster_gym envs/T1.yaml values the MuJoCo loop (play_mujoco.py) reads; tests check them against the pinned upstream file. Nothing is tuned.",
+  "$comment": "Configuration profile (robot-capability-specs v2.0.2). settings.training copies the published booster_gym envs/T1.yaml values the MuJoCo loop (play_mujoco.py) reads; tests check them against the pinned upstream file. Nothing is tuned.",
   "format": "livingproof-configuration-profile/0.1",
   "robot": "booster-t1",
   "name": "stock",

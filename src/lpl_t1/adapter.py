@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """The Booster T1 adapter for livingproof-sim-mujoco's generic walk-hallway evidence loop.
 Only robot-specific code and data live here: the per-configuration model (booster_gym or
-playground), the published controllers, the seeded initial pose and the profiles."""
+playground), the published controllers, the nominal initial pose and the profiles."""
 
 from __future__ import annotations
 
@@ -36,10 +36,15 @@ class T1:
 
         return OnnxPolicy(model, ctrl.policy_path, ctrl.spec)
 
-    def initial_state(self, model, data, ctrl, seed, noise, spawn) -> None:
+    def initial_state(self, model, data, ctrl, spawn: str, *, start_offset=None) -> None:
+        """Exact nominal pose at ``spawn``. ``start_offset`` is one declared comparison change.
+
+        Signature matches livingproof-sim-mujoco v2.0.1 ``Robot.initial_state``:
+        ``(model, data, ctrl, spawn, start_offset=None)``. There is no seed and no noise.
+        """
         from lpl_t1.walk import initial_state
 
-        initial_state(model, data, ctrl, seed, noise, spawn)
+        initial_state(model, data, ctrl, spawn, start_offset=start_offset)
 
     def runner_settings(self) -> dict:
         from lpl_t1.walk import runner_settings
