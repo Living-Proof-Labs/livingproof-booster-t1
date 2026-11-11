@@ -24,7 +24,7 @@ tasks:
     desc: Tick-by-tick match against booster_gym play_mujoco.py (fresh sensor reads, T1.pt as the actor); exits 1 on FAIL
     cmds: [uv run python -m lpl_t1.reference --ticks 500]
   repin:
-    desc: "Repin release refs to real tags (lock has runner v2.0.1, verifier v1.16.1, reporter v3.3.0): task repin -- runner=vX.Y.Z"
+    desc: "Repin release refs to real tags (lock has runner v2.0.1, verifier v1.16.1, reporter v3.3.1): task repin -- runner=vX.Y.Z"
     cmds: ['uvx --from git+https://github.com/Living-Proof-Labs/capability-verifier@{{.VERIFIER_COMMIT}} python -m capability_verifier.repin --root . {{.CLI_ARGS}}']
   repin:check:
     desc: Fail while verification.lock.json has PENDING_RELEASE refs or the runner is not on its locked tag
