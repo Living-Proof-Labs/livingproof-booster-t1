@@ -26,9 +26,9 @@ def fetch(root=ROOT, opener=None):
 PIN = "da396a06d6eed99e2de72d7749c48ee8748950f9"
 
 
-def test_profiles_match_the_pinned_v1_5_0_schemas():
+def test_profiles_match_the_pinned_v2_0_2_schemas():
     pins = json.loads((ROOT / "pins.json").read_text())["groups"]
-    assert pins["specs"]["tag"] == "v1.5.0" and pins["specs"]["commit"].startswith("1df6eaa")
+    assert pins["specs"]["tag"] == "v2.0.2" and pins["specs"]["commit"].startswith("16524cb")
     assert pins["booster_gym"]["commit"] == PIN
     rob = robot()
     assert rob["id"] == "booster-t1" and rob["class"] == "humanoid"
@@ -161,13 +161,24 @@ def test_scenario_parameters_follow_the_pinned_acceptance_table():
     from lpl_t1 import scenario as sc
 
     text = local("specs", "specs/scenarios/walk-hallway/README.md").read_text()
-    for row in ("| `command_speed` | 0.5 m/s", "Route length 5.5 m", "| `required_passes` | 18"):
+    for row in (
+        "| `command_speed` | 0.5 m/s",
+        "Route length 5.5 m",
+        "| `trials` | 1 |",
+        "exact nominal pose at `spawn-entrance`",
+        "0.05 m humanoid",
+    ):
         assert row in text, row
+    assert "required_passes" not in text and "seeds" not in text
     p = sc.parameters("stock")
     assert (p["time_limit"], p["exit_x"], p["fall_height"]) == (27.0, 3.0, 0.44)
-    assert "0.05 m humanoid" in text and p["wall_clearance"] == 0.05
+    assert p["wall_clearance"] == 0.05
     width = robot()["dimensions"]["width"]["value"]
     assert p["lateral_limit"] == pytest.approx(1.5 / 2 - width / 2) == pytest.approx(0.4795)
+    plan = json.loads((ROOT / "verification.lock.json").read_text())["plan"]
+    # The specification default is 1. This package publishes 3 identical trials.
+    assert plan == {"trials": {"count": 3}, "command_speed": 0.5}
+    assert "seeds" not in plan and "required_passes" not in plan
     pre = {c["name"]: c for c in sc.preconditions("stock")}
     assert all(c["met"] for c in pre.values()), pre
     assert width + 2 * 0.05 <= 1.5 and "0.641 m vs 1.5 m" in pre["fits_width"]["detail"]
@@ -185,16 +196,29 @@ def test_a_robot_too_wide_for_the_hallway_is_unsupported(tmp_path, monkeypatch):
     assert pre["fits_width"] is False
 
 
-def test_seed_noise_is_deterministic_and_starts_at_the_spawn():
-    from lpl_t1.walk import initial_state, runner_settings
+def test_nominal_pose_is_exact_and_start_offset_is_one_declared_change():
+    from lpl_t1.adapter import ROBOT
+    from lpl_t1.walk import initial_state
 
-    scene = build()
-    m, c = scene.model, controller("stock", scene)
-    states = []
-    for _ in range(2):
+    for name in ("stock", "playground"):
+        scene = build(model="playground" if name == "playground" else "booster_gym")
+        m, c = scene.model, controller(name, scene)
         d = mujoco.MjData(m)
-        initial_state(m, d, c, 7, runner_settings()["initial_noise"], "spawn-entrance")
-        states.append(d.qpos.copy())
-    np.testing.assert_array_equal(*states)
-    pos, _ = place_pose(m, "spawn-entrance")
-    assert abs(states[0][0] - pos[0]) <= 0.02 and states[0][2] == 0.72
+        ROBOT.initial_state(m, d, c, "spawn-entrance")
+        nominal = d.qpos.copy()
+        np.testing.assert_allclose(d.qvel, 0.0)
+        pos, _ = place_pose(m, "spawn-entrance")
+        np.testing.assert_allclose(nominal[0:2], pos[0:2])
+        if name == "stock":
+            assert nominal[2] == 0.72
+        again = mujoco.MjData(m)
+        initial_state(m, again, c, "spawn-entrance")
+        np.testing.assert_array_equal(again.qpos, nominal)
+        shifted = mujoco.MjData(m)
+        ROBOT.initial_state(
+            m, shifted, c, "spawn-entrance", start_offset={"base_xy_m": [0.0, 0.05]}
+        )
+        np.testing.assert_allclose(shifted.qpos[0], nominal[0])
+        np.testing.assert_allclose(shifted.qpos[1], nominal[1] + 0.05)
+        np.testing.assert_allclose(shifted.qpos[2:], nominal[2:])
+        np.testing.assert_allclose(shifted.qvel, 0.0)

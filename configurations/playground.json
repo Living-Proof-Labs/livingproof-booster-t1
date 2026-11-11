@@ -1,5 +1,5 @@
 {
-  "$comment": "Configuration profile (robot-capability-specs v1.5.0). Every value is MuJoCo Playground's play_t1_joystick.py / t1_mjx_feetonly.xml at the pinned commit; tests check them against the pinned upstream files. Nothing is tuned.",
+  "$comment": "Configuration profile (robot-capability-specs v2.0.2). Every value is MuJoCo Playground's play_t1_joystick.py / t1_mjx_feetonly.xml at the pinned commit; tests check them against the pinned upstream files. Nothing is tuned.",
   "format": "livingproof-configuration-profile/0.1",
   "robot": "booster-t1",
   "name": "playground",

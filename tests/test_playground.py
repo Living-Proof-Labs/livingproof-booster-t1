@@ -98,12 +98,12 @@ def test_stand_height_backs_the_locomotion_heights():
 
 
 def test_initial_state_holds_the_default_pose_in_ctrl():
-    from lpl_t1.walk import initial_state, runner_settings
+    from lpl_t1.adapter import ROBOT
 
     scene = build(model="playground")
     m, d = scene.model, mujoco.MjData(scene.model)
     c = controller("playground", scene)
-    zero = {k: 0.0 for k in runner_settings()["initial_noise"]}
-    initial_state(m, d, c, 1, zero, "spawn-entrance")
+    ROBOT.initial_state(m, d, c, "spawn-entrance")
     assert np.allclose(d.ctrl, m.key("home").ctrl)
     assert math.isclose(d.qpos[2], 0.665)
+    np.testing.assert_allclose(d.qvel, 0.0)
