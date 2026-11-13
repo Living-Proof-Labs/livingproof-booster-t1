@@ -1,0 +1,34 @@
+site_name: Living Proof Labs · Booster T1
+site_url: https://docs.livingprooflabs.com/livingproof-booster-t1/
+repo_url: https://github.com/Living-Proof-Labs/livingproof-booster-t1
+use_directory_urls: false
+strict: true
+theme:
+  name: zensical
+  font: false
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle: {icon: lucide/moon, name: Switch to dark mode}
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle: {icon: lucide/sun, name: Switch to light mode}
+extra_css: [assets/brand.css]
+markdown_extensions:
+  - tables
+  - toc: {permalink: true}
+  - pymdownx.superfences
+nav:
+  - Documentation home: https://docs.livingprooflabs.com/
+  - Start here: index.md
+  - Guides: guide.md
+  - Reference:
+      - Tasks: tasks.md
+  - Verification: verification.md
+  - Contribute: contribute.md
+  - Version and source: version.md
+  - License: license.md

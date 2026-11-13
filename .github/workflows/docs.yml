@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Repository manual
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Build and check manual
+        run: |
+          python3 -m venv .cache/docs-venv
+          .cache/docs-venv/bin/pip install --require-hashes -r tools/docs/requirements.lock
+          python3 tools/docs/install-task.py
+          export PATH="$PWD/.cache/docs-bin:$PWD/.cache/docs-venv/bin:$PATH"
+          python tools/docs/build.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: repository-manual
+          path: artifacts/docs/
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: artifacts/docs/html
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: booster-t1-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Require current main inside deployment lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE: ${{ github.sha }}
+        run: |
+          current=$(gh api repos/Living-Proof-Labs/livingproof-booster-t1/git/ref/heads/main --jq .object.sha)
+          test "$current" = "$CANDIDATE"
+      - name: Deploy verified manual
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
