@@ -1,5 +1,8 @@
 # livingproof-booster-t1
 
+**Start here: documentation** — [manual source and build instructions](docs/index.md).
+The rendered manual is pending deployment verification.
+
 Living Proof Labs robot package: Booster Robotics T1 humanoid. It pins an official model and a published, ready-made walking controller so the robot can be validated in the livingproof simulators (MuJoCo first) and in the [livingproof-worlds](https://github.com/Living-Proof-Labs/livingproof-worlds) test worlds.
 
 Living Proof Labs does not train controllers. A robot is validated only with a walking controller or policy its maker or a maintained project has already published.
