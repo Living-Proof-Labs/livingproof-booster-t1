@@ -9,6 +9,5 @@
     "value": 10.0,
     "source": "chosen",
     "reason": "Zero-command standing check length (publisher loop)."
-  },
-  "wall_contact_model": "Conservative world-AABB gap between every robot body geom and each wall box; the walls are visual only so the published model and its collision geoms stay unchanged. A sample with gap <= 0 counts as a wall contact."
+  }
 }
