@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """configurations/playground.json: pinned files, published values, exact reference."""
 
-import json
 import math
 import re
 
@@ -34,9 +33,7 @@ def test_every_playground_file_is_pinned_and_apache_2():
     for a in (conf["controller"]["artifact"], s["reference"], s["scene"], s["robot_mjcf"]):
         assert a["license"] == "Apache-2.0" and a["commit"].startswith("12ad7f3")
         assert sha256(local("playground", a["path"])) == a["sha256"]
-    lock = json.loads((ROOT / "verification.lock.json").read_text())
-    entry = {c["name"]: c for c in lock["configurations"]}["playground"]
-    assert entry["sha256"] == digest and entry["version"] == "1.0.0"
+    assert digest == sha256(ROOT / "configurations/playground.json")
 
 
 def test_settings_equal_play_t1_joystick():

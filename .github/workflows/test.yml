@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+# Runs the robot package tests. ubuntu-24.04-arm is a native runner; this
+# workflow does not register emulation.
+name: Test
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    env:
+      MUJOCO_GL: osmesa
+      PYOPENGL_PLATFORM: osmesa
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install OSMesa
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libosmesa6
+      - name: Install uv
+        run: |
+          python3 -m pip install --user uv==0.13.6
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the locked environment
+        run: uv sync --locked
+      - name: Ruff
+        run: |
+          uv run --no-sync ruff check .
+          uv run --no-sync ruff format --check .
+      - name: Test
+        run: uv run --no-sync pytest tests

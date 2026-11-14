@@ -4,8 +4,10 @@ The docs workflow checks generated HTML links and fragments, revision metadata,
 and shared brand inclusion, and retains a review artifact for 14 days. It does
 not execute robot trials, grade capabilities, or measure software coverage.
 
-[Verify workflow runs](https://github.com/Living-Proof-Labs/livingproof-booster-t1/actions/workflows/verify.yml)
-are the source of actual scenario outcomes and evidence for stock and Playground.
+Scenario runs are published by
+[livingproof-verification](https://github.com/Living-Proof-Labs/livingproof-verification).
+This repository publishes the adapter and the stock and Playground configurations.
+It does not select a world or a scenario, and it does not store run evidence.
 A successful documentation build is not a passing robot grade. This manual does
 not embed scenario results or measured coverage. Native CLI/API generation is
 not part of this initial manual; the existing source and guide remain available.

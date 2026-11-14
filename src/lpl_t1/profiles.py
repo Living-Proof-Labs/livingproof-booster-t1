@@ -26,7 +26,7 @@ SCHEMAS = {
 
 
 class Unsupported(Exception):
-    """A scenario precondition is not met; ``precondition`` names it."""
+    """The named configuration is not one this robot publishes."""
 
     def __init__(self, precondition: str, detail: str):
         super().__init__(f"{precondition}: {detail}")

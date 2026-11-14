@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The Booster T1 MuJoCo models plus the pinned hallway world.
+"""The Booster T1 MuJoCo models.
 
-booster_gym's T1_locomotion.xml (stock) and MuJoCo Playground's flat-terrain T1 scene
-(playground) are loaded unchanged. For booster_gym that means: its timestep, solver settings,
-collision geoms, ground plane and <motor> actuators (ctrlrange = published torque limits)
-are not touched. The world's walls are added as visual-only boxes (contype 0,
-conaffinity 0), so they create no contacts; wall clearance is checked geometrically.
-Named places become sites, read back from the compiled model.
+booster_gym's T1_locomotion.xml (stock) and MuJoCo Playground's flat-terrain T1
+scene (playground) are loaded unchanged: timestep, solver settings, collision
+geoms, ground plane and actuators stay as published. This module does not load
+a world.
 """
 
 from __future__ import annotations
@@ -14,12 +12,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from livingproof_sim_mujoco import scene as generic
-from livingproof_sim_mujoco.scene import PLACE, WORLD, place_pose  # noqa: F401
 import mujoco
+from livingproof_sim_mujoco.pins import load_pins, local
+from livingproof_sim_mujoco.scene import actuator_table
 
 from lpl_t1 import ROOT
-from livingproof_sim_mujoco.pins import load_pins, local
 
 SCENE = "resources/T1/T1_locomotion.xml"
 PLAYGROUND_SCENE = "mujoco_playground/_src/locomotion/t1/xmls/scene_mjx_feetonly_flat_terrain.xml"
@@ -35,10 +32,6 @@ class Scene:
     walls: list[str]
 
 
-def load_world(root: Path = ROOT) -> dict:
-    return generic.load_world(root)
-
-
 def model_path(model: str = "booster_gym", root: Path = ROOT) -> Path:
     """The pinned MJCF of a configuration's ``settings.model``."""
     group, path = MODELS[model]
@@ -51,11 +44,9 @@ def raw_model(root: Path = ROOT, model: str = "booster_gym") -> mujoco.MjModel:
 
 
 def build(root: Path = ROOT, model: str = "booster_gym") -> Scene:
-    """Compile a pinned model unchanged plus the hallway's visual walls and places."""
+    """Compile a pinned model unchanged. No world geometry is added."""
     load_pins(root)
     spec = mujoco.MjSpec.from_file(str(model_path(model, root)))
-    world = load_world(root)
-    walls = generic.add_world(spec, world)
-    m = spec.compile()
-    ctrlrange = generic.actuator_table(m)[1]
-    return Scene(m, world, ctrlrange, walls)
+    compiled = spec.compile()
+    ctrlrange = actuator_table(compiled)[1]
+    return Scene(compiled, {}, ctrlrange, [])

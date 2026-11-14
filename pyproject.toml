@@ -1,7 +1,7 @@
 [project]
 name = "livingproof-booster-t1"
 version = "0.1.0"
-description = "Booster T1 robot package: pinned model, published controller and the hallway walk check"
+description = "Booster T1 robot package: pinned model, published controllers and the simulator adapter"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = [
@@ -31,9 +31,7 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
-# The runner, pinned to the release tag in verification.lock.json releases.runner (v2.0.3).
-# `task repin -- runner=vX.Y.Z` rewrites this tag and the lock's releases.runner tag and
-# commit, then `uv lock`.
+# The simulator library this adapter imports, pinned to released tag v2.0.3.
 livingproof-sim-mujoco = { git = "https://github.com/Living-Proof-Labs/livingproof-sim-mujoco.git", tag = "v2.0.3" }
 
 [tool.pytest.ini_options]
@@ -43,5 +41,5 @@ addopts = "-ra"
 line-length = 100
 
 [tool.livingproof]
-# walk-hallway CI (capability-verifier walk-hallway.yml) runs livingproof_sim_mujoco.evidence on this
+# Callers pass this object to the simulator. This package does not select a world or a scenario.
 adapter = "lpl_t1.adapter:ROBOT"
