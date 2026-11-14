@@ -36,7 +36,9 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.de
 
 ## Tasks
 
-`uv sync`, `uv run pytest tests`, `task profile:measure`, `task profile:stand`, `task reference`, `task reference:playground`.
+`uv sync`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest tests`, `task profile:measure`, `task profile:stand`, `task reference`, `task reference:playground`.
+
+The Test workflow runs ruff and pytest on `ubuntu-24.04` and `ubuntu-24.04-arm` for pull requests and pushes to `main`.
 
 ## Rules
 

@@ -55,7 +55,7 @@ def test_adapter_scene_is_the_published_model():
 
 def test_workflows_do_not_select_a_scenario():
     workflows = sorted(p.name for p in (ROOT / ".github/workflows").iterdir())
-    assert workflows == ["docs.yml", "release.yml"]
+    assert workflows == ["docs.yml", "release.yml", "test.yml"]
     text = "\n".join((ROOT / ".github/workflows" / name).read_text() for name in workflows)
     assert "workflow_call" not in text
     assert "pull-requests:" not in text

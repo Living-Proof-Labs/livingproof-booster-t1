@@ -102,7 +102,11 @@ def test_pins_locks_and_runner_do_not_select_a_world_or_scenario():
 
 def test_workflows_have_no_world_or_scenario_inputs():
     workflow_dir = ROOT / ".github" / "workflows"
-    assert sorted(p.name for p in workflow_dir.iterdir()) == ["docs.yml", "release.yml"]
+    assert sorted(p.name for p in workflow_dir.iterdir()) == [
+        "docs.yml",
+        "release.yml",
+        "test.yml",
+    ]
     for path in sorted(workflow_dir.iterdir()):
         document = yaml.safe_load(path.read_text(encoding="utf-8"))
         keys = set()
@@ -113,6 +117,28 @@ def test_workflows_have_no_world_or_scenario_inputs():
             uses = job.get("uses", "")
             assert isinstance(uses, str)
             assert not NAMES.search(uses)
+
+
+def test_test_workflow_runs_on_pull_request():
+    """CI runs the suite and ruff on pull requests, on both native runners."""
+    path = ROOT / ".github" / "workflows" / "test.yml"
+    docs = (ROOT / ".github" / "workflows" / "docs.yml").read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8")
+    document = yaml.safe_load(text)
+    trigger = document.get("on", document.get(True))
+    assert "pull_request" in trigger
+    assert trigger["push"]["branches"] == ["main"]
+    assert document["permissions"] == {"contents": "read"}
+    assert "secrets" not in text
+    assert "upload-artifact" not in text and "deploy-pages" not in text
+    job = document["jobs"]["test"]
+    assert "permissions" not in job
+    assert job["strategy"]["matrix"]["os"] == ["ubuntu-24.04", "ubuntu-24.04-arm"]
+    checkout = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
+    assert checkout in docs and checkout in text
+    assert "uv run --no-sync ruff check ." in text
+    assert "uv run --no-sync ruff format --check ." in text
+    assert "uv run --no-sync pytest tests" in text
 
 
 def test_package_does_not_load_a_world_or_wrap_a_scenario():
