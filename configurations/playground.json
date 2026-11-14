@@ -89,7 +89,7 @@
       ],
       "size": 85
     },
-    "scene_note": "play_t1_joystick.py loads the rough-terrain scene (heightfield floor, keyframe z 0.72). The hallway floor is flat, so this configuration uses Playground's flat-terrain scene of the same robot MJCF (plane floor, keyframe home z 0.665), as the G1 playground configuration does. The robot MJCF, actuators and gains are unchanged.",
+    "scene_note": "play_t1_joystick.py loads the rough-terrain scene (heightfield floor, keyframe z 0.72). This configuration uses Playground's flat-terrain scene of the same robot MJCF (plane floor, keyframe home z 0.665), as the G1 playground configuration does. The robot MJCF, actuators and gains are unchanged.",
     "command_note": "play_t1_joystick.py's vel_scale_x/y/rot (1, 0.8, 1) only scale gamepad input; the runner passes the command directly. Its phase is pi for |command| < 0.01; only non-zero commands are run.",
     "actuation": "position: the MJCF's own <position> actuators (kp from its default classes, joint damping/armature as published); ctrl = action * 1.0 + keyframe home qpos[7:], once per 10 physics steps, first in physics step 9"
   }

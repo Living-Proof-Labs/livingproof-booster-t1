@@ -1,9 +1,9 @@
 # Booster T1 manual
 
-This robot package pins Booster T1 models and published controllers for Living
-Proof Labs simulation and hallway verification. Start with the existing
+This robot package pins Booster T1 models and published controllers and exposes
+them through a simulator adapter. Start with the existing
 [installation, reference checks, and configuration guide](../README.md).
-It does not train controllers or certify real-world robot safety.
+It does not train controllers, select a world or a scenario, or certify real-world robot safety.
 
 The package supplies an adapter to the separately owned simulator and verifier.
 The guide describes both stock and Playground configurations and their known

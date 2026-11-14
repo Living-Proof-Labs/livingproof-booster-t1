@@ -12,7 +12,8 @@ from livingproof_sim_mujoco.pins import ChecksumError, sha256
 from lpl_t1.measure import measure
 from lpl_t1.profiles import Unsupported, configuration, controller, robot, validate
 from lpl_t1.publisher import training_config
-from lpl_t1.scene import SCENE, build, place_pose, raw_model
+from lpl_t1.adapter import ROBOT
+from lpl_t1.scene import SCENE, build, raw_model
 
 
 def local(group: str, path: str):
@@ -102,7 +103,8 @@ def test_runner_accepts_the_published_policy():
 
 
 def test_scene_keeps_the_published_model():
-    raw, m = raw_model(), build().model
+    raw, built = raw_model(), build()
+    m = built.model
     for attr in ("timestep", "iterations", "integrator", "disableflags", "cone"):
         assert getattr(m.opt, attr) == getattr(raw.opt, attr), attr
 
@@ -119,18 +121,20 @@ def test_scene_keeps_the_published_model():
 
     assert collisions(m) == collisions(raw)
     np.testing.assert_array_equal(m.actuator_ctrlrange, raw.actuator_ctrlrange)
-    walls = [m.geom(n) for n in build().walls]
-    assert [w.name for w in walls] == ["wall-left", "wall-right"]
-    assert all(m.geom_contype[w.id] == 0 == m.geom_conaffinity[w.id] for w in walls)
+    assert m.ngeom == raw.ngeom and built.walls == [] and built.world == {}
     assert str(local("booster_gym", SCENE)).endswith("T1_locomotion.xml")
 
 
-def test_spawn_comes_from_the_world_place():
+def test_nominal_base_is_the_published_pose_without_a_world_place():
+    """The start pose is the controller's published pose. No world place is compiled in."""
     scene = build()
-    world = {p["name"]: p for p in scene.world["places"]}
-    pos, yaw = place_pose(scene.model, "spawn-entrance")
-    np.testing.assert_allclose(pos, world["spawn-entrance"]["position"])
-    assert yaw == pytest.approx(np.radians(world["spawn-entrance"]["yaw_deg"]))
+    names = {scene.model.site(i).name for i in range(scene.model.nsite)}
+    assert not any(name.startswith("place:") for name in names)
+    c = controller("stock", scene)
+    data = mujoco.MjData(scene.model)
+    ROBOT.initial_state(scene.model, data, c, "spawn-entrance")
+    np.testing.assert_allclose(data.qpos[0:3], [0.0, 0.0, 0.72])
+    np.testing.assert_allclose(data.qvel, 0.0)
 
 
 def test_robot_dimensions_are_the_measured_ones():
@@ -157,49 +161,33 @@ def test_fetch_rejects_a_download_with_the_wrong_checksum(tmp_path):
     assert not (tmp_path / "d" / "f.txt").exists()
 
 
-def test_scenario_parameters_follow_the_pinned_acceptance_table():
-    from lpl_t1 import scenario as sc
-
-    text = local("specs", "specs/scenarios/walk-hallway/README.md").read_text()
-    for row in (
-        "| `command_speed` | 0.5 m/s",
-        "Route length 5.5 m",
-        "| `trials` | 1 |",
-        "exact nominal pose at `spawn-entrance`",
-        "0.05 m humanoid",
-    ):
-        assert row in text, row
-    assert "required_passes" not in text and "seeds" not in text
-    p = sc.parameters("stock")
-    assert (p["time_limit"], p["exit_x"], p["fall_height"]) == (27.0, 3.0, 0.44)
-    assert p["wall_clearance"] == 0.05
-    width = robot()["dimensions"]["width"]["value"]
-    assert p["lateral_limit"] == pytest.approx(1.5 / 2 - width / 2) == pytest.approx(0.4795)
-    plan = json.loads((ROOT / "verification.lock.json").read_text())["plan"]
-    # The specification default is 1. This package publishes 3 identical trials.
-    assert plan == {"trials": {"count": 3}, "command_speed": 0.5}
-    assert "seeds" not in plan and "required_passes" not in plan
-    pre = {c["name"]: c for c in sc.preconditions("stock")}
-    assert all(c["met"] for c in pre.values()), pre
-    assert width + 2 * 0.05 <= 1.5 and "0.641 m vs 1.5 m" in pre["fits_width"]["detail"]
-    pre = {c["name"]: c["met"] for c in sc.preconditions("vendor-x")}
-    assert pre["configuration_offered"] is False
+def test_profiles_record_robot_facts_without_grading_them():
+    """Width, fall height and the command interface are profile data. This package does not grade them."""
+    rob = robot()
+    conf = configuration("stock")[0]
+    assert rob["dimensions"]["width"]["value"] == 0.541
+    assert conf["locomotion"]["fall_base_height"]["value"] == 0.44
+    assert conf["controller"]["interface"] == ["velocity_command"]
+    assert conf["controller"]["rate_hz"] == 50
+    pinned = json.loads((ROOT / "pins.json").read_text())["groups"]
+    assert "worlds" not in pinned
+    for path in pinned["specs"]["files"]:
+        assert "/scenarios/" not in path
+    with pytest.raises(Unsupported, match="configuration_offered"):
+        configuration("vendor-x")
 
 
-def test_a_robot_too_wide_for_the_hallway_is_unsupported(tmp_path, monkeypatch):
-    from lpl_t1 import scenario as sc
-
-    wide = robot()
-    wide["dimensions"]["width"]["value"] = 1.41
-    monkeypatch.setattr(sc, "robot", lambda root=ROOT: wide)
-    pre = {c["name"]: c["met"] for c in sc.preconditions("stock")}
-    assert pre["fits_width"] is False
+def test_an_unknown_configuration_is_unsupported_and_width_is_not_graded():
+    """A missing configuration is unsupported. A recorded width is not accepted or rejected here."""
+    assert robot()["dimensions"]["width"]["value"] == measure()["width_m"]
+    with pytest.raises(Unsupported) as caught:
+        configuration("vendor-x")
+    assert caught.value.precondition == "configuration_offered"
+    assert not hasattr(ROBOT, "preconditions")
+    assert not hasattr(ROBOT, "world")
 
 
 def test_nominal_pose_is_exact_and_start_offset_is_one_declared_change():
-    from lpl_t1.adapter import ROBOT
-    from lpl_t1.walk import initial_state
-
     for name in ("stock", "playground"):
         scene = build(model="playground" if name == "playground" else "booster_gym")
         m, c = scene.model, controller(name, scene)
@@ -207,12 +195,13 @@ def test_nominal_pose_is_exact_and_start_offset_is_one_declared_change():
         ROBOT.initial_state(m, d, c, "spawn-entrance")
         nominal = d.qpos.copy()
         np.testing.assert_allclose(d.qvel, 0.0)
-        pos, _ = place_pose(m, "spawn-entrance")
-        np.testing.assert_allclose(nominal[0:2], pos[0:2])
+        np.testing.assert_allclose(nominal[0:2], c.initial_qpos[0:2])
         if name == "stock":
             assert nominal[2] == 0.72
+        else:
+            assert nominal[2] == pytest.approx(0.665)
         again = mujoco.MjData(m)
-        initial_state(m, again, c, "spawn-entrance")
+        ROBOT.initial_state(m, again, c, "spawn-entrance")
         np.testing.assert_array_equal(again.qpos, nominal)
         shifted = mujoco.MjData(m)
         ROBOT.initial_state(

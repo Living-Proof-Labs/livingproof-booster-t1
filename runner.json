@@ -1,6 +1,5 @@
 {
-  "$comment": "Runner settings for this repository's MuJoCo walk check. Not a specification format: scenario parameters come from the pinned walk-hallway scenario and the selected configuration profile. Trials start at the exact nominal pose; this file has no seeds and no noise.",
-  "scenario": "walk-hallway@0.1.0",
+  "$comment": "Runner settings for this robot. sample_hz and stand_seconds are properties of the published controllers. Trials start at the exact nominal pose. This file has no seeds and no noise, and it does not name a scenario or a world.",
   "sample_hz": {
     "value": 50,
     "source": "chosen",
