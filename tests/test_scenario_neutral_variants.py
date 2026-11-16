@@ -56,7 +56,9 @@ def test_no_json_document_has_a_world_or_scenario_key_under_any_spelling():
     for path in _json_documents():
         found: list[str] = []
         _keys(json.loads(path.read_text(encoding="utf-8")), found)
-        bad = sorted({k for k in found if SELECTING_KEY.match(k)})
+        # manifest.json declares support. Every other scenario or world key is selection.
+        allowed = {"scenarios"} if path.relative_to(ROOT).as_posix() == "manifest.json" else set()
+        bad = sorted({k for k in found if SELECTING_KEY.match(k) and k not in allowed})
         if bad:
             offenders.append(f"{path.relative_to(ROOT)}: {bad}")
     assert offenders == []
