@@ -94,13 +94,13 @@ def test_stand_height_backs_the_locomotion_heights():
     assert conf["locomotion"]["nominal_base_height"]["value"] == 0.67
 
 
-def test_initial_state_holds_the_default_pose_in_ctrl():
+def test_nominal_state_holds_the_default_pose_in_ctrl():
     from lpl_t1.adapter import ROBOT
 
     scene = build(model="playground")
     m, d = scene.model, mujoco.MjData(scene.model)
     c = controller("playground", scene)
-    ROBOT.initial_state(m, d, c, "spawn-entrance")
+    ROBOT.nominal_state(m, d, c)
     assert np.allclose(d.ctrl, m.key("home").ctrl)
     assert math.isclose(d.qpos[2], 0.665)
     np.testing.assert_allclose(d.qvel, 0.0)

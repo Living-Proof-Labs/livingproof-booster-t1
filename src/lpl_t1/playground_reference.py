@@ -116,7 +116,7 @@ def _setup(root):
     model.opt.timestep = 0.002  # play_t1_joystick.py: sim_dt
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, 0)
-    c = controller("playground", Scene(model, {}, {}, []), root)
+    c = controller("playground", Scene(model, {}), root)
     return model, data, c
 
 

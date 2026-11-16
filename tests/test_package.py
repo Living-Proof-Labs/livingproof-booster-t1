@@ -138,7 +138,8 @@ def test_scene_keeps_the_published_model():
 
     assert collisions(m) == collisions(raw)
     np.testing.assert_array_equal(m.actuator_ctrlrange, raw.actuator_ctrlrange)
-    assert m.ngeom == raw.ngeom and built.walls == [] and built.world == {}
+    assert m.ngeom == raw.ngeom
+    assert not hasattr(built, "walls") and not hasattr(built, "world")
     assert str(local("booster_gym", SCENE)).endswith("T1_locomotion.xml")
 
 
@@ -149,7 +150,7 @@ def test_nominal_base_is_the_published_pose_without_a_world_place():
     assert not any(name.startswith("place:") for name in names)
     c = controller("stock", scene)
     data = mujoco.MjData(scene.model)
-    ROBOT.initial_state(scene.model, data, c, "spawn-entrance")
+    ROBOT.nominal_state(scene.model, data, c)
     np.testing.assert_allclose(data.qpos[0:3], [0.0, 0.0, 0.72])
     np.testing.assert_allclose(data.qvel, 0.0)
 
@@ -244,7 +245,7 @@ def test_nominal_pose_is_exact_and_start_offset_is_one_declared_change():
         scene = build(model="playground" if name == "playground" else "booster_gym")
         m, c = scene.model, controller(name, scene)
         d = mujoco.MjData(m)
-        ROBOT.initial_state(m, d, c, "spawn-entrance")
+        ROBOT.nominal_state(m, d, c)
         nominal = d.qpos.copy()
         np.testing.assert_allclose(d.qvel, 0.0)
         np.testing.assert_allclose(nominal[0:2], c.initial_qpos[0:2])
@@ -253,12 +254,10 @@ def test_nominal_pose_is_exact_and_start_offset_is_one_declared_change():
         else:
             assert nominal[2] == pytest.approx(0.665)
         again = mujoco.MjData(m)
-        ROBOT.initial_state(m, again, c, "spawn-entrance")
+        ROBOT.nominal_state(m, again, c)
         np.testing.assert_array_equal(again.qpos, nominal)
         shifted = mujoco.MjData(m)
-        ROBOT.initial_state(
-            m, shifted, c, "spawn-entrance", start_offset={"base_xy_m": [0.0, 0.05]}
-        )
+        ROBOT.nominal_state(m, shifted, c, start_offset={"base_xy_m": [0.0, 0.05]})
         np.testing.assert_allclose(shifted.qpos[0], nominal[0])
         np.testing.assert_allclose(shifted.qpos[1], nominal[1] + 0.05)
         np.testing.assert_allclose(shifted.qpos[2:], nominal[2:])

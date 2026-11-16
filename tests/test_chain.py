@@ -44,8 +44,7 @@ def test_adapter_scene_is_the_published_model():
     """The adapter compiles the pinned model and does not attach a world."""
     for name in ("stock", "playground"):
         scene = ROBOT.scene(name)
-        assert scene.walls == []
-        assert scene.world == {}
+        assert not hasattr(scene, "walls") and not hasattr(scene, "world")
         assert scene.model.nbody > 1
     assert not hasattr(ROBOT, "world")
     settings = ROBOT.runner_settings()

@@ -61,7 +61,7 @@ def ours(command, steps, qpos0, root=ROOT):
     from livingproof_sim_mujoco.policy import OnnxPolicy
 
     model = raw_model(root)
-    c = controller("stock", Scene(model, {}, {}, []), root)
+    c = controller("stock", Scene(model, {}), root)
     data = mujoco.MjData(model)
     data.qpos[:] = qpos0
     mujoco.mj_forward(model, data)
