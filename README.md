@@ -14,11 +14,12 @@ Living Proof Labs does not train controllers. A robot is validated only with a w
 | Model `resources/T1/T1_locomotion.xml` + meshes | [BoosterRobotics/booster_gym](https://github.com/BoosterRobotics/booster_gym) @ `da396a0` | Apache-2.0 |
 | Policy `deploy/models/T1.pt` (TorchScript actor) | same commit | Apache-2.0 |
 | Training config `envs/T1.yaml`, loop `play_mujoco.py`, `export_model.py` | same commit | Apache-2.0 |
-| Robot and configuration profile schemas | robot-capability-specs v2.0.2 (`16524cb`) | Apache-2.0 |
+| Robot, configuration, and robot-manifest schemas | robot-capability-specs v2.3.0 (`57317e6`) | Apache-2.0 |
 
 ## Layout
 
 - `robot.json`: robot profile (dimensions measured from the pinned model: `task profile:measure`).
+- `manifest.json`: robot manifest. Its `scenarios` list names the scenario ids this adapter supports. It does not select a world or a scenario for a run.
 - `configurations/stock.json`: the published controller with the obs/action layout, PD gains, default pose and rates of `envs/T1.yaml`, exactly as `play_mujoco.py` uses them. No tuning.
 - `configurations/playground.json`: MuJoCo Playground's published T1 joystick policy on Playground's own T1 MJCF.
 - `src/lpl_t1/adapter.py`: the simulator adapter (`lpl_t1.adapter:ROBOT`). It loads a configuration's model and controller. It does not load a world.

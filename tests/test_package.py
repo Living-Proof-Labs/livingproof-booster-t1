@@ -27,9 +27,9 @@ def fetch(root=ROOT, opener=None):
 PIN = "da396a06d6eed99e2de72d7749c48ee8748950f9"
 
 
-def test_profiles_match_the_pinned_v2_0_2_schemas():
+def test_profiles_match_the_pinned_v2_3_0_schemas():
     pins = json.loads((ROOT / "pins.json").read_text())["groups"]
-    assert pins["specs"]["tag"] == "v2.0.2" and pins["specs"]["commit"].startswith("16524cb")
+    assert pins["specs"]["tag"] == "v2.3.0" and pins["specs"]["commit"].startswith("57317e6")
     assert pins["booster_gym"]["commit"] == PIN
     rob = robot()
     assert rob["id"] == "booster-t1" and rob["class"] == "humanoid"

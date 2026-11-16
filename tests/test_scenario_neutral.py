@@ -17,6 +17,12 @@ ROOT = Path(__file__).resolve().parents[1]
 GUARD = Path(__file__).resolve()
 # Readers of evidence already recorded in this repo would be listed here.
 LEGACY_EVIDENCE = ()
+# The robot manifest declares supported scenario ids. It does not select a run.
+# tests/test_supported_scenarios.py locks that list.
+DECLARED_SUPPORT = (
+    "manifest.json",
+    "tests/test_supported_scenarios.py",
+)
 SKIP_DIRS = {
     ".git",
     ".cache",
@@ -66,7 +72,7 @@ def test_scenario_and_world_names_stay_in_legacy_evidence():
     offenders = []
     for path in _text_files():
         rel = _rel(path)
-        if rel in LEGACY_EVIDENCE:
+        if rel in LEGACY_EVIDENCE or rel in DECLARED_SUPPORT:
             continue
         try:
             text = path.read_text(encoding="utf-8")
