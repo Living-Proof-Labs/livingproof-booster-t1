@@ -75,7 +75,7 @@ def test_the_package_does_not_add_the_world():
     assert not hasattr(ROBOT, "world")
     for name, model in (("stock", "booster_gym"), ("playground", "playground")):
         scene = build(model=model)
-        assert scene.world == {} and scene.walls == [], name
+        assert not hasattr(scene, "world") and not hasattr(scene, "walls"), name
 
 
 def test_published_pins_record_each_artifact_byte_count():

@@ -2,7 +2,7 @@
 """runner.json holds robot timing only, the same keys as the G1 and Go1 packages.
 
 wall_contact_model described a contact check against world walls. This package
-adds no walls (Scene.walls is empty) and no code reads the key.
+adds no walls (the simulator adds the world) and no code reads the key.
 """
 
 import json

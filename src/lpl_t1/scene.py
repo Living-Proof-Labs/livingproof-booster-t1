@@ -4,7 +4,7 @@
 booster_gym's T1_locomotion.xml (stock) and MuJoCo Playground's flat-terrain T1
 scene (playground) are loaded unchanged: timestep, solver settings, collision
 geoms, ground plane and actuators stay as published. This module does not load
-a world.
+a world: the simulator adds the world, its walls and its places.
 """
 
 from __future__ import annotations
@@ -27,9 +27,7 @@ BASE_BODY = "Trunk"
 @dataclass
 class Scene:
     model: mujoco.MjModel
-    world: dict
     ctrlrange: dict[str, tuple[float, float]]  # motor torque limits, by actuator name
-    walls: list[str]
 
 
 def model_path(model: str = "booster_gym", root: Path = ROOT) -> Path:
@@ -49,4 +47,4 @@ def build(root: Path = ROOT, model: str = "booster_gym") -> Scene:
     spec = mujoco.MjSpec.from_file(str(model_path(model, root)))
     compiled = spec.compile()
     ctrlrange = actuator_table(compiled)[1]
-    return Scene(compiled, {}, ctrlrange, [])
+    return Scene(compiled, ctrlrange)
