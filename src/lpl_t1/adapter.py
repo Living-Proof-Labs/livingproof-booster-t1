@@ -49,14 +49,27 @@ def _start_offset(start_offset) -> tuple[np.ndarray, float]:
     return dxy, dyaw
 
 
+class MissingPlace(SystemExit, KeyError):
+    """A start place the composed world does not have.
+
+    The simulator's own stop for an incompatible run: a ``SystemExit`` whose text starts
+    with ``INCOMPATIBLE`` and says no trial was recorded, so a run reports it the same way
+    as the simulator's other start-place checks rather than as a traceback. It is also a
+    ``KeyError`` for callers that catch a missing place. ``str()`` is the message.
+    """
+
+    def __str__(self) -> str:
+        return str(self.args[0]) if self.args else ""
+
+
 def missing_place(spawn: str) -> str:
     """The error for a start place that is not on the compiled model."""
     from livingproof_sim_mujoco.scene import PLACE
 
     return (
-        f"start place {spawn!r} is not on the compiled model (no site {PLACE + spawn!r}). "
-        "Compose the world first, so its places are compiled in, then call "
-        "initial_state(model, data, ctrl, 'spawn-entrance'). "
+        f"INCOMPATIBLE: start place {spawn!r} is not a place in the composed world "
+        f"(no site {PLACE + spawn!r} on the compiled model). No trial was recorded. "
+        "The scenario start must name a pose in that world, such as 'spawn-entrance'. "
         "For the controller's nominal pose with no world, call nominal_state(model, data, ctrl)."
     )
 
@@ -110,8 +123,9 @@ class T1:
         Signature matches livingproof-sim-mujoco ``Robot.initial_state``:
         ``(model, data, ctrl, spawn, start_offset=None)``. There is no seed and no noise.
         ``spawn`` is a place the simulator has already compiled into ``model``; this
-        method does not load a world. A missing place raises ``KeyError``, as the Go1 and
-        G1 adapters do: the trial would otherwise start at the origin. Use
+        method does not load a world. A missing place raises ``MissingPlace``, the
+        simulator's ``INCOMPATIBLE`` stop (a ``SystemExit``, also a ``KeyError``), as the
+        Go1 and G1 adapters do: the trial would otherwise start at the origin. Use
         ``nominal_state`` for the published nominal pose with no world.
         """
         from livingproof_sim_mujoco.scene import PLACE
@@ -119,7 +133,7 @@ class T1:
 
         names = {model.site(i).name for i in range(model.nsite)}
         if f"{PLACE}{spawn}" not in names:
-            raise KeyError(missing_place(spawn))
+            raise MissingPlace(missing_place(spawn))
         initial_state(model, data, ctrl, spawn, start_offset=start_offset)
 
     def nominal_state(self, model, data, ctrl, *, start_offset=None) -> None:
