@@ -53,15 +53,20 @@ def test_installed_evidence_command_requires_lock():
     assert "required" in result.stderr and "--lock" in result.stderr
 
 
-PUBLISHED_TAG = "v3.0.7"
-PUBLISHED_COMMIT = "bfbf8b55b6774cfdb0a56b02583e72f1dd4bd77b"
+# Reviewed floor: do not freeze the exact current tag or commit.
+MIN_TAG = (3, 0, 7)
 
 
-def test_the_pin_is_the_published_v3_0_7_release():
+def test_the_pin_is_at_least_the_reviewed_v3_release_and_agrees():
     tag = _source_tag()
-    assert tag == PUBLISHED_TAG
+    match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", tag)
+    assert match, tag
+    assert tuple(int(part) for part in match.groups()) >= MIN_TAG, tag
     lock = tomllib.loads((ROOT / "uv.lock").read_text())
     (package,) = [p for p in lock["package"] if p["name"] == "livingproof-sim-mujoco"]
-    assert package["version"] == "3.0.7"
-    assert package["source"]["git"] == f"{URL}?tag={PUBLISHED_TAG}#{PUBLISHED_COMMIT}"
-    assert importlib.metadata.version("livingproof-sim-mujoco") == "3.0.7"
+    assert package["version"] == tag[1:]
+    prefix = f"{URL}?tag={tag}#"
+    assert package["source"]["git"].startswith(prefix)
+    commit = package["source"]["git"].removeprefix(prefix)
+    assert re.fullmatch(r"[0-9a-f]{40}", commit), commit
+    assert importlib.metadata.version("livingproof-sim-mujoco") == tag[1:]
