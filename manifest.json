@@ -609,6 +609,7 @@
   ],
   "features": {},
   "scenarios": [
-    "walk-hallway"
+    "walk-hallway",
+    "walk-corner"
   ]
 }

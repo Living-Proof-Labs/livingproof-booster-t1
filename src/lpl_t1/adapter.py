@@ -164,5 +164,15 @@ class T1:
 
         return {"model": model_of(name, self.root)}
 
+    def drive(self, name: str, model, ctrl, policy, places: dict):
+        """Steer the published controller along the scenario's route (``lpl_t1.route``).
+
+        livingproof-sim-mujoco v3.2.0 calls this for a scenario with no command that
+        ``manifest.json`` declares. ``step(data)`` sends one velocity command per step.
+        """
+        from lpl_t1.route import drive
+
+        return drive(self, name, model, ctrl, policy, places)
+
 
 ROBOT = T1()
