@@ -24,6 +24,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0  # release tags, for the package version
       - name: Install OSMesa
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libosmesa6
       - name: Install uv
