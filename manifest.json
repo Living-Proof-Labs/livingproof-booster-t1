@@ -1,5 +1,5 @@
 {
-  "$comment": "Robot manifest (livingproof-robot-manifest/0.1, robot-capability-specs v2.3.0). scenarios names the scenario ids this adapter supports. walk-corner is not listed until the adapter implements the corner. source.commit is main when this declaration was written; profile, configuration and asset digests are the bytes in this tree.",
+  "$comment": "Robot manifest (livingproof-robot-manifest/0.1, robot-capability-specs v2.3.0). scenarios names the scenario ids this adapter supports. walk-corner is not listed until the adapter implements the corner. source.commit is the main commit this declaration was written against. The profile, configuration, and asset digests describe the committing tree.",
   "format": "livingproof-robot-manifest/0.1",
   "robot": "booster-t1",
   "source": {
@@ -19,14 +19,14 @@
       "name": "stock",
       "version": "1.0.0",
       "path": "configurations/stock.json",
-      "sha256": "e1a31114c93861baf888fb28e786b0a6269144ba9f9c0e00a13a0934d9ccc701",
+      "sha256": "e1626385968e82997bebce743fab19fb2f2661da3def41de2a594051911c324a",
       "default": true
     },
     {
       "name": "playground",
       "version": "1.0.0",
       "path": "configurations/playground.json",
-      "sha256": "e8c6406dfb0053fe03a77a5e6049dfe9c1b97f01c9cacc87cde9312d7b2d7d9e"
+      "sha256": "beb97983a415b43f21e4cad0a715692e7d2b76bf1e55b58240871b754e0d4407"
     }
   ],
   "assets": [

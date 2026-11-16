@@ -27,6 +27,23 @@ def fetch(root=ROOT, opener=None):
 PIN = "da396a06d6eed99e2de72d7749c48ee8748950f9"
 
 
+# configuration-profile 1.0.0 as published on main. Any byte change needs a new version.
+PUBLISHED_CONFIGURATION_1_0_0 = {
+    "configurations/stock.json": "e1626385968e82997bebce743fab19fb2f2661da3def41de2a594051911c324a",
+    "configurations/playground.json": "beb97983a415b43f21e4cad0a715692e7d2b76bf1e55b58240871b754e0d4407",
+}
+
+
+def test_configuration_profile_1_0_0_keeps_its_published_digest():
+    """One profile version is one file. A comment edit would change the sha256."""
+    manifest = json.loads((ROOT / "manifest.json").read_text())
+    cited = {entry["path"]: entry for entry in manifest["configurations"]}
+    for path, digest in PUBLISHED_CONFIGURATION_1_0_0.items():
+        assert sha256(ROOT / path) == digest
+        assert cited[path]["version"] == "1.0.0"
+        assert cited[path]["sha256"] == digest
+
+
 def test_profiles_match_the_pinned_v2_3_0_schemas():
     pins = json.loads((ROOT / "pins.json").read_text())["groups"]
     assert pins["specs"]["tag"] == "v2.3.0" and pins["specs"]["commit"].startswith("57317e6")
