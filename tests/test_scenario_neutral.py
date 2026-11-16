@@ -22,6 +22,8 @@ LEGACY_EVIDENCE = ()
 DECLARED_SUPPORT = (
     "manifest.json",
     "tests/test_supported_scenarios.py",
+    # Runs the declared scenarios end to end, so it names their worlds (#40, 11b).
+    "tests/test_route_drive.py",
 )
 SKIP_DIRS = {
     ".git",
