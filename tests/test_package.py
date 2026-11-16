@@ -162,6 +162,39 @@ def test_robot_dimensions_are_the_measured_ones():
 
 
 def test_fetch_rejects_a_download_with_the_wrong_checksum(tmp_path):
+    """A body of the pinned length with the wrong sha256 is a ChecksumError.
+
+    v3 refuses a pin that omits ``bytes`` with ValueError before any download.
+    ``bytes`` here is the length of the body this test supplies, so the runner
+    checksums that body instead of stopping on the missing-field error.
+    """
+    body = b"tampered"
+    downloaded = []
+
+    def opener(url):
+        downloaded.append(url)
+        return io.BytesIO(body)
+
+    pins = {
+        "groups": {
+            "g": {
+                "repository": "o/r",
+                "commit": "c",
+                "dest": "d",
+                "files": {"f.txt": {"sha256": "0" * 64, "bytes": len(body)}},
+            }
+        }
+    }
+    (tmp_path / "pins.json").write_text(json.dumps(pins))
+    with pytest.raises(ChecksumError, match="f.txt") as caught:
+        fetch(tmp_path, opener=opener)
+    assert downloaded, "the body was not downloaded, so the checksum was never checked"
+    assert "missing bytes" not in str(caught.value)
+    assert not (tmp_path / "d" / "f.txt").exists()
+
+
+def test_fetch_rejects_a_pin_that_omits_bytes(tmp_path):
+    """A pin without ``bytes`` is a ValueError and downloads nothing."""
     pins = {
         "groups": {
             "g": {
@@ -173,8 +206,10 @@ def test_fetch_rejects_a_download_with_the_wrong_checksum(tmp_path):
         }
     }
     (tmp_path / "pins.json").write_text(json.dumps(pins))
-    with pytest.raises(ChecksumError, match="f.txt"):
-        fetch(tmp_path, opener=lambda url: io.BytesIO(b"tampered"))
+    downloaded = []
+    with pytest.raises(ValueError, match="g:f.txt: pin is missing bytes"):
+        fetch(tmp_path, opener=lambda url: downloaded.append(url) or io.BytesIO(b"tampered"))
+    assert downloaded == []
     assert not (tmp_path / "d" / "f.txt").exists()
 
 
