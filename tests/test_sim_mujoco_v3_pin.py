@@ -51,3 +51,17 @@ def test_installed_evidence_command_requires_lock():
     result = _run("livingproof_sim_mujoco.evidence", ADAPTER, "stock", "out")
     assert result.returncode == 2, result.stderr
     assert "required" in result.stderr and "--lock" in result.stderr
+
+
+PUBLISHED_TAG = "v3.0.7"
+PUBLISHED_COMMIT = "bfbf8b55b6774cfdb0a56b02583e72f1dd4bd77b"
+
+
+def test_the_pin_is_the_published_v3_0_7_release():
+    tag = _source_tag()
+    assert tag == PUBLISHED_TAG
+    lock = tomllib.loads((ROOT / "uv.lock").read_text())
+    (package,) = [p for p in lock["package"] if p["name"] == "livingproof-sim-mujoco"]
+    assert package["version"] == "3.0.7"
+    assert package["source"]["git"] == f"{URL}?tag={PUBLISHED_TAG}#{PUBLISHED_COMMIT}"
+    assert importlib.metadata.version("livingproof-sim-mujoco") == "3.0.7"
