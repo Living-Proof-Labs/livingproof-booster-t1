@@ -201,7 +201,7 @@ dev = [
 requires-dist = [
     { name = "imageio", extras = ["ffmpeg"], specifier = "==2.38.1" },
     { name = "jsonschema", specifier = "==4.26.0" },
-    { name = "livingproof-sim-mujoco", extras = ["torch", "media"], git = "https://github.com/Living-Proof-Labs/livingproof-sim-mujoco.git?tag=v3.0.6" },
+    { name = "livingproof-sim-mujoco", extras = ["torch", "media"], git = "https://github.com/Living-Proof-Labs/livingproof-sim-mujoco.git?tag=v3.0.7" },
     { name = "mujoco", specifier = "==3.17.0" },
     { name = "numpy", marker = "python_full_version < '3.12'", specifier = "==2.4.6" },
     { name = "numpy", marker = "python_full_version >= '3.12'", specifier = "==2.5.4" },
@@ -230,8 +230,8 @@ source = { git = "https://github.com/Living-Proof-Labs/robot-capability-specs?su
 
 [[package]]
 name = "livingproof-sim-mujoco"
-version = "3.0.6"
-source = { git = "https://github.com/Living-Proof-Labs/livingproof-sim-mujoco.git?tag=v3.0.6#1034020ab62a5eae89884305b18d5a256d2360f9" }
+version = "3.0.7"
+source = { git = "https://github.com/Living-Proof-Labs/livingproof-sim-mujoco.git?tag=v3.0.7#bfbf8b55b6774cfdb0a56b02583e72f1dd4bd77b" }
 dependencies = [
     { name = "livingproof-common" },
     { name = "livingproof-scenario-parameters" },

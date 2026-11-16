@@ -51,3 +51,22 @@ def test_installed_evidence_command_requires_lock():
     result = _run("livingproof_sim_mujoco.evidence", ADAPTER, "stock", "out")
     assert result.returncode == 2, result.stderr
     assert "required" in result.stderr and "--lock" in result.stderr
+
+
+# Reviewed floor: do not freeze the exact current tag or commit.
+MIN_TAG = (3, 0, 7)
+
+
+def test_the_pin_is_at_least_the_reviewed_v3_release_and_agrees():
+    tag = _source_tag()
+    match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", tag)
+    assert match, tag
+    assert tuple(int(part) for part in match.groups()) >= MIN_TAG, tag
+    lock = tomllib.loads((ROOT / "uv.lock").read_text())
+    (package,) = [p for p in lock["package"] if p["name"] == "livingproof-sim-mujoco"]
+    assert package["version"] == tag[1:]
+    prefix = f"{URL}?tag={tag}#"
+    assert package["source"]["git"].startswith(prefix)
+    commit = package["source"]["git"].removeprefix(prefix)
+    assert re.fullmatch(r"[0-9a-f]{40}", commit), commit
+    assert importlib.metadata.version("livingproof-sim-mujoco") == tag[1:]
