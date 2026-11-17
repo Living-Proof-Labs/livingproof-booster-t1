@@ -20,6 +20,13 @@ LEGACY_EVIDENCE = ()
 # The robot manifest declares supported scenario ids. It does not select a run.
 # tests/test_supported_scenarios.py locks that list.
 DECLARED_SUPPORT = (
+    # Exact released inputs for adapter-only tests, not runtime selection.
+    "tests/test_shared_traversals.py",
+    "tests/data/reuse/world.json",
+    "tests/data/reuse/release.json",
+    "tests/data/reuse/left.json",
+    "tests/data/reuse/right.json",
+    "tests/data/reuse/sources.json",
     "manifest.json",
     "tests/test_supported_scenarios.py",
     # Runs the declared scenarios end to end, so it names their worlds (#40, 11b).
