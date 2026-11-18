@@ -16,7 +16,7 @@ from lpl_t1.profiles import validate
 
 SPECS_COMMIT = "57317e617014a6df97bb7fba9d92a890af8d42e5"
 SCHEMA = "specs/robots/robot-manifest.schema.json"
-DECLARED = ["walk-hallway", "walk-corner"]
+DECLARED = ["walk-hallway", "walk-corner", "walk-corner-left", "walk-corner-right"]
 
 
 def test_manifest_declares_walk_hallway_and_walk_corner_and_validates_against_the_spec():
