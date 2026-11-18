@@ -15,6 +15,7 @@ from pathlib import Path
 import livingproof_sim_mujoco
 import pytest
 from livingproof_sim_mujoco import evidence
+from source_bundle import bound_sources
 
 from lpl_t1 import ROOT
 from lpl_t1.adapter import ROBOT
@@ -83,10 +84,11 @@ def _run(
     }
     tmp_path.mkdir(parents=True, exist_ok=True)
     path = tmp_path / "caller.lock.json"
-    path.write_text(json.dumps(lock))
-    return evidence.evidence(
-        "lpl_t1.adapter:ROBOT", name, tmp_path / "out", lock=path, trials=trials
-    )
+    with bound_sources(ROOT, lock, world_path, document):
+        path.write_text(json.dumps(lock))
+        return evidence.evidence(
+            "lpl_t1.adapter:ROBOT", name, tmp_path / "out", lock=path, trials=trials
+        )
 
 
 @pytest.mark.parametrize("name", CONFIGURATIONS)
