@@ -95,7 +95,7 @@ def build():
         with page.open("a") as handle:
             handle.write(
                 f"\n\n---\n\n[Documentation home](https://docs.livingprooflabs.com/) · "
-                f"[Source · {commit[:12]}]({REPO}/tree/{commit}) · "
+                f'[Source · development]({REPO}/tree/{commit} "{commit}") · '
                 f"[Version and source](version.md) · [Help / report an issue]({REPO}/issues) · "
                 "[License](license.md)\n"
             )
@@ -116,19 +116,60 @@ class Links(HTMLParser):
         super().__init__()
         self.ids = set()
         self.links = []
+        self.skip = 0
+        self.in_footer = 0
+        self.in_link = False
+        self.link_attrs = {}
+        self.link_text = []
+        self.source_links = []
+        self.footer_text = []
+        self.visible_text = []
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if tag in ("script", "style"):
+            self.skip += 1
+        if tag == "footer" or self.in_footer:
+            self.in_footer += 1
         if "id" in attrs:
             self.ids.add(attrs["id"])
         if tag == "a" and "href" in attrs:
             self.links.append(attrs["href"])
+        if tag == "a":
+            self.in_link = True
+            self.link_attrs = attrs
+            self.link_text = []
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style") and self.skip:
+            self.skip -= 1
+        if self.in_footer:
+            self.in_footer -= 1
+        if tag == "a" and self.in_link:
+            text = "".join(self.link_text).strip()
+            if text.startswith("Source · development"):
+                self.source_links.append(
+                    (text, self.link_attrs.get("href", ""), self.link_attrs.get("title", ""))
+                )
+            self.in_link = False
+
+    def handle_data(self, data):
+        if self.skip:
+            return
+        self.visible_text.append(data)
+        if self.in_footer:
+            self.footer_text.append(data)
+        if self.in_link:
+            self.link_text.append(data)
 
 
 def verify():
     html = OUT / "html"
     pages = {p.resolve(): Links(p.read_text()) for p in html.rglob("*.html")}
+    commit = json.loads((html / "build.json").read_text())["source_commit"]
+    assert re.fullmatch("[0-9a-f]{40}", commit)
+    sha_pattern = re.compile(r"\b[0-9a-f]{7,40}\b", re.IGNORECASE)
     for path, parsed in pages.items():
         text = path.read_text()
         assert "assets/brand.css" in text, path
@@ -143,9 +184,16 @@ def verify():
             assert target.exists(), (path, link)
             if url.fragment and target in pages:
                 assert unquote(url.fragment) in pages[target].ids, (path, link)
-    assert re.fullmatch(
-        "[0-9a-f]{40}", json.loads((html / "build.json").read_text())["source_commit"]
-    )
+        footer_text = " ".join(parsed.footer_text)
+        assert not sha_pattern.search(footer_text), (path, footer_text)
+        for link_text, href, title in parsed.source_links:
+            assert link_text == "Source · development", (path, link_text)
+            assert not sha_pattern.search(link_text), (path, link_text)
+            assert commit in href, (path, href)
+            assert commit in title, (path, title)
+        if path.name != "version.html":
+            visible = " ".join(parsed.visible_text)
+            assert commit[:7] not in visible, path
     print(f"PASS: {len(pages)} HTML pages; local links/fragments, brand, and source identity")
 
 
