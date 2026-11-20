@@ -21,6 +21,7 @@ jobs:
           .cache/docs-venv/bin/pip install --require-hashes -r tools/docs/requirements.lock
           python3 tools/docs/install-task.py
           export PATH="$PWD/.cache/docs-bin:$PWD/.cache/docs-venv/bin:$PATH"
+          python -m unittest discover -s tools/docs -p "test_*.py"
           python tools/docs/build.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ !cancelled() }}
