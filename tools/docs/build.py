@@ -2,13 +2,13 @@
 """Build the repository manual without importing or executing robot code."""
 
 import hashlib
-from html.parser import HTMLParser
 import json
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+from html.parser import HTMLParser
+from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from urllib.request import urlopen
 
@@ -111,12 +111,60 @@ def build():
     verify()
 
 
-class Links(HTMLParser):
+class VisibleHTMLParser(HTMLParser):
+    """Ignore non-rendered HTML; CSS visibility is checked in the browser tests."""
+
+    VOID_TAGS = (
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.hidden_elements = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        style = re.sub(r"\s+", "", attrs.get("style", "").lower())
+        hidden = (
+            tag in ("script", "style", "template")
+            or "hidden" in attrs
+            or "display:none" in style
+            or "visibility:hidden" in style
+        )
+        if tag not in self.VOID_TAGS:
+            self.hidden_elements.append((tag, hidden))
+
+    def handle_endtag(self, tag):
+        for index in range(len(self.hidden_elements) - 1, -1, -1):
+            if self.hidden_elements[index][0] == tag:
+                del self.hidden_elements[index:]
+                break
+
+
+def commit_pattern(commit):
+    """Match this build's full or abbreviated identity, not arbitrary hex words."""
+    prefixes = "|".join(re.escape(commit[:length]) for length in range(7, 41))
+    return re.compile(r"\b(?:" + prefixes + r")\b", re.IGNORECASE)
+
+
+class Links(VisibleHTMLParser):
     def __init__(self, text):
         super().__init__()
         self.ids = set()
         self.links = []
-        self.skip = 0
         self.in_footer = 0
         self.in_link = False
         self.link_attrs = {}
@@ -127,10 +175,9 @@ class Links(HTMLParser):
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
+        super().handle_starttag(tag, attrs)
         attrs = dict(attrs)
-        if tag in ("script", "style"):
-            self.skip += 1
-        if tag == "footer" or self.in_footer:
+        if tag not in self.VOID_TAGS and (tag == "footer" or self.in_footer):
             self.in_footer += 1
         if "id" in attrs:
             self.ids.add(attrs["id"])
@@ -142,8 +189,9 @@ class Links(HTMLParser):
             self.link_text = []
 
     def handle_endtag(self, tag):
-        if tag in ("script", "style") and self.skip:
-            self.skip -= 1
+        if tag in self.VOID_TAGS:
+            return
+        super().handle_endtag(tag)
         if self.in_footer:
             self.in_footer -= 1
         if tag == "a" and self.in_link:
@@ -155,7 +203,7 @@ class Links(HTMLParser):
             self.in_link = False
 
     def handle_data(self, data):
-        if self.skip:
+        if any(hidden for _, hidden in self.hidden_elements):
             return
         self.visible_text.append(data)
         if self.in_footer:
@@ -169,7 +217,7 @@ def verify():
     pages = {p.resolve(): Links(p.read_text()) for p in html.rglob("*.html")}
     commit = json.loads((html / "build.json").read_text())["source_commit"]
     assert re.fullmatch("[0-9a-f]{40}", commit)
-    sha_pattern = re.compile(r"\b[0-9a-f]{7,40}\b", re.IGNORECASE)
+    sha_pattern = commit_pattern(commit)
     for path, parsed in pages.items():
         text = path.read_text()
         assert "assets/brand.css" in text, path
@@ -193,7 +241,7 @@ def verify():
             assert commit in title, (path, title)
         if path.name != "version.html":
             visible = " ".join(parsed.visible_text)
-            assert commit[:7] not in visible, path
+            assert not sha_pattern.search(visible), (path, visible)
     print(f"PASS: {len(pages)} HTML pages; local links/fragments, brand, and source identity")
 
 
