@@ -3,6 +3,7 @@
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -13,6 +14,8 @@ from urllib.parse import unquote, urlsplit
 from urllib.request import urlopen
 
 import yaml
+
+from release import published
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "artifacts/docs"
@@ -26,6 +29,15 @@ def run(*args):
 def build():
     commit = run("git", "rev-parse", "HEAD")
     dirty = bool(run("git", "status", "--porcelain"))
+    release = (
+        published()
+        if os.environ.get("RELEASE_TAG") or os.environ.get("GITHUB_EVENT_NAME") == "workflow_run"
+        else None
+    )
+    if release and dirty:
+        raise ValueError("A released manual requires a clean checkout")
+    label = release["tag"] if release else "development"
+    source_ref = label if release else commit
     source = OUT / "source"
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -74,6 +86,7 @@ def build():
     (source / "assets").mkdir()
     (source / "assets/brand.css").write_bytes(brand)
     record = {
+        "release": release,
         "source_commit": commit,
         "source_dirty": dirty,
         "brand": lock,
@@ -83,9 +96,15 @@ def build():
         },
     }
     (source / "build.json").write_text(json.dumps(record, indent=2) + "\n")
+    identity = (
+        f"Released manual: **{label}**. [Immutable release]({REPO}/releases/tag/{label}).\n\n"
+        if release
+        else "This is development documentation, not a package release.\n\n"
+    )
     (source / "version.md").write_text(
-        "# Version and source\n\nThis is development documentation, not a package release.\n\n"
-        f"Source commit: [`{commit}`]({REPO}/tree/{commit}). Dirty preview: **{dirty}**.\n\n"
+        "# Version and source\n\n"
+        + identity
+        + f"Source commit: [`{commit}`]({REPO}/tree/{commit}). Dirty preview: **{dirty}**.\n\n"
         "A dirty preview includes uncommitted changes; [build metadata](build.json) records source hashes.\n\n"
         "Supported context: the dependencies and verification lock in this source revision. "
         f"Historical rendered manuals are not maintained; use [source tags]({REPO}/tags).\n\n"
@@ -95,7 +114,7 @@ def build():
         with page.open("a") as handle:
             handle.write(
                 f"\n\n---\n\n[Documentation home](https://docs.livingprooflabs.com/) · "
-                f'[Source · development]({REPO}/tree/{commit} "{commit}") · '
+                f'[Source · {label}]({REPO}/tree/{source_ref} "{commit}") · '
                 f"[Version and source](version.md) · [Help / report an issue]({REPO}/issues) · "
                 "[License](license.md)\n"
             )
@@ -196,7 +215,7 @@ class Links(VisibleHTMLParser):
             self.in_footer -= 1
         if tag == "a" and self.in_link:
             text = "".join(self.link_text).strip()
-            if text.startswith("Source · development"):
+            if text.startswith("Source · "):
                 self.source_links.append(
                     (text, self.link_attrs.get("href", ""), self.link_attrs.get("title", ""))
                 )
@@ -215,8 +234,14 @@ class Links(VisibleHTMLParser):
 def verify():
     html = OUT / "html"
     pages = {p.resolve(): Links(p.read_text()) for p in html.rglob("*.html")}
-    commit = json.loads((html / "build.json").read_text())["source_commit"]
+    record = json.loads((html / "build.json").read_text())
+    commit = record["source_commit"]
+    label = record["release"]["tag"] if record.get("release") else "development"
+    source_ref = label if record.get("release") else commit
     assert re.fullmatch("[0-9a-f]{40}", commit)
+    if record.get("release"):
+        assert record["release"] == {"tag": label, "version": label[1:], "commit": commit}
+        assert record["source_dirty"] is False
     sha_pattern = commit_pattern(commit)
     for path, parsed in pages.items():
         text = path.read_text()
@@ -232,12 +257,17 @@ def verify():
             assert target.exists(), (path, link)
             if url.fragment and target in pages:
                 assert unquote(url.fragment) in pages[target].ids, (path, link)
+        if path.name != "404.html":
+            assert parsed.source_links, (path, "missing source identity")
+        if path.name == "version.html" and record.get("release"):
+            assert label in " ".join(parsed.visible_text), path
+            assert f"{REPO}/releases/tag/{label}" in parsed.links, path
         footer_text = " ".join(parsed.footer_text)
         assert not sha_pattern.search(footer_text), (path, footer_text)
         for link_text, href, title in parsed.source_links:
-            assert link_text == "Source · development", (path, link_text)
+            assert link_text == f"Source · {label}", (path, link_text)
             assert not sha_pattern.search(link_text), (path, link_text)
-            assert commit in href, (path, href)
+            assert href == f"{REPO}/tree/{source_ref}", (path, href)
             assert commit in title, (path, title)
         if path.name != "version.html":
             visible = " ".join(parsed.visible_text)

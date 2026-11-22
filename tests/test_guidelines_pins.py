@@ -27,7 +27,14 @@ USES = re.compile(
 )
 PRESET = re.compile(rf"^github>{REPO}:renovate-preset#(?P<ref>.+)$")
 SHARED_RELEASE_INPUTS = {"dry-run", "draft-release"}
-SHARED_RELEASE_OUTPUTS = {"draft-created", "published", "version", "git-tag", "release-url"}
+SHARED_RELEASE_OUTPUTS = {
+    "draft-created",
+    "published",
+    "version",
+    "git-tag",
+    "commit",
+    "release-url",
+}
 
 
 def _root() -> Path:

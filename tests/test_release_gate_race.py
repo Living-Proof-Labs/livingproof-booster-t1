@@ -99,7 +99,7 @@ def gate_allows(expr: str, context: dict) -> bool:
 
 def release_if() -> str:
     jobs = _load(RELEASE)["jobs"]
-    (job,) = jobs.values()
+    job = jobs["release"]
     cond = job.get("if")
     assert isinstance(cond, str) and cond.strip(), "the release job needs an explicit if:"
     return cond
@@ -244,8 +244,13 @@ def test_release_workflow_is_one_privileged_call_and_runs_no_repository_code() -
     doc = _load(RELEASE)
     assert doc["permissions"] == {"contents": "read"}
     jobs = doc["jobs"]
-    assert len(jobs) == 1, "a workflow_run workflow holds a write token: keep it to one job"
-    ((name, job),) = jobs.items()
+    assert set(jobs) == {"release", "deploy-manual"}
+    name, job = "release", jobs["release"]
+    assert jobs["deploy-manual"]["permissions"] == {
+        "contents": "read",
+        "pages": "write",
+        "id-token": "write",
+    }
     assert "steps" not in job, "no steps: nothing from the repository runs with contents: write"
     assert job["permissions"] == {"contents": "write"}
     assert job["uses"].startswith(f"{GUIDELINES}/.github/workflows/semantic-release.yml@v")

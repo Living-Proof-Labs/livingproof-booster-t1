@@ -264,7 +264,7 @@ def test_repository_workflows_authenticate_every_main_freshness_read():
         "id-token": "write",
     }
     steps = job["steps"]
-    guard = steps[0]
+    guard = next(s for s in steps if s.get("name") == "Require current main inside deployment lock")
     assert guard["name"] == "Require current main inside deployment lock"
     assert guard["env"]["CANDIDATE"] == "${{ github.sha }}"
     assert guard["env"]["GH_TOKEN"] == "${{ github.token }}"
@@ -272,9 +272,9 @@ def test_repository_workflows_authenticate_every_main_freshness_read():
     assert FRESHNESS in guard["run"]
     assert "urlopen" not in guard["run"]
     assert 'test "$current" = "$CANDIDATE"' in guard["run"]
-    assert steps[1]["uses"].startswith("actions/deploy-pages@")
-    assert steps[1].get("id") == "deployment"
-    assert "always()" not in str(steps[1].get("if", ""))
+    assert steps[-1]["uses"].startswith("actions/deploy-pages@")
+    assert steps[-1].get("id") == "deployment"
+    assert "always()" not in str(steps[-1].get("if", ""))
 
 
 def test_unauthenticated_urllib_freshness_read_fails():
@@ -296,7 +296,7 @@ def test_gh_api_without_a_token_fails():
 
 def test_this_workflows_freshness_read_fails_when_its_token_is_removed():
     text = (WORKFLOWS / "docs.yml").read_text()
-    stripped = text.replace("          GH_TOKEN: ${{ github.token }}\n", "", 1)
+    stripped = text.replace("          GH_TOKEN: ${{ github.token }}\n", "")
     assert stripped != text
     problems = freshness_problems("docs.yml", stripped)
     assert any("without authentication" in problem for problem in problems), problems
@@ -315,7 +315,11 @@ def test_contents_write_fails_even_when_the_read_sends_a_token():
 
 def _run_guard(tmp_path, *, remote_sha, http_status):
     document = yaml.safe_load((WORKFLOWS / "docs.yml").read_text())
-    guard = document["jobs"]["deploy"]["steps"][0]
+    guard = next(
+        s
+        for s in document["jobs"]["deploy"]["steps"]
+        if s.get("name") == "Require current main inside deployment lock"
+    )
     bindir = tmp_path / "bin"
     bindir.mkdir()
     gh = bindir / "gh"

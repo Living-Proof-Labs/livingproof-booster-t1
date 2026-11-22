@@ -10,36 +10,38 @@ on:
       release_version:
         required: true
         type: string
+      release_commit:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing release tag (vX.Y.Z) to build and deploy
-        required: false
+        description: Existing immutable release at current main; blank builds a read-only preview
         type: string
         default: ''
 permissions:
   contents: read
 jobs:
   build:
+    outputs:
+      pages-id: ${{ steps.pages.outputs.artifact_id }}
+      pages-sha256: ${{ steps.seal.outputs.sha256 }}
+      pages-name: ${{ format('github-pages-{0}-{1}', github.run_id, github.run_attempt) }}
     runs-on: ubuntu-24.04
     env:
+      GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.release_tag }}
       RELEASE_VERSION: ${{ inputs.release_version }}
+      RELEASE_COMMIT: ${{ inputs.release_commit }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ inputs.release_tag || github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-          fetch-tags: true
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Require release tag to match the exact verified commit
-        if: inputs.release_tag != ''
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$GITHUB_SHA"
+          fetch-depth: 0
+      - name: Validate the exact published release
+        if: github.event_name == 'workflow_run' || inputs.release_tag != ''
+        run: python3 tools/docs/release.py published
       - name: Build and check manual
         run: |
           python3 -m venv .cache/docs-venv
@@ -51,14 +53,21 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ !cancelled() }}
         with:
-          name: repository-manual
+          name: repository-manual${{ inputs.release_tag && format('-{0}', inputs.release_tag) || '' }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/docs/
           retention-days: 14
           if-no-files-found: error
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
+      - id: pages
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.release_tag != ''
         with:
+          name: ${{ format('github-pages-{0}-{1}', github.run_id, github.run_attempt) }}
+          retention-days: 14
           path: artifacts/docs/html
+      - name: Record the uploaded tar digest
+        id: seal
+        if: steps.pages.outputs.artifact_id != ''
+        run: echo "sha256=$(sha256sum "$RUNNER_TEMP/artifact.tar" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
   deploy:
     needs: build
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.release_tag != ''
@@ -74,6 +83,70 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Use the same-run Actions artifact client (like deploy-pages), not the REST index.
+      # An exact ID and name must both resolve to the sealed Pages tar before deploying.
+      - name: Require a valid Pages artifact ID
+        shell: bash
+        env:
+          UPLOADED_ID: ${{ needs.build.outputs.pages-id }}
+        run: |
+          [[ "$UPLOADED_ID" =~ ^[1-9][0-9]*$ ]]
+      - name: Read exact Pages artifact by ID
+        id: pages-id-first
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.build.outputs.pages-id }}
+          path: ${{ runner.temp }}/booster-pages-id-first
+      - name: Allow the ID lookup to settle
+        if: steps.pages-id-first.outcome == 'failure'
+        run: sleep 4
+      - name: Retry read by ID once
+        id: pages-id-retry
+        if: steps.pages-id-first.outcome == 'failure'
+        timeout-minutes: 2
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.build.outputs.pages-id }}
+          path: ${{ runner.temp }}/booster-pages-id-retry
+      - name: Read exact Pages artifact by name
+        id: pages-name-first
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ needs.build.outputs.pages-name }}
+          path: ${{ runner.temp }}/booster-pages-name-first
+      - name: Allow the name lookup to settle
+        if: steps.pages-name-first.outcome == 'failure'
+        run: sleep 4
+      - name: Retry read by name once
+        id: pages-name-retry
+        if: steps.pages-name-first.outcome == 'failure'
+        timeout-minutes: 2
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ needs.build.outputs.pages-name }}
+          path: ${{ runner.temp }}/booster-pages-name-retry
+      - name: Require matching ID and name readback of the exact tar
+        shell: bash
+        env:
+          EXPECTED_TAR: ${{ needs.build.outputs.pages-sha256 }}
+          EXPECTED_NAME: ${{ needs.build.outputs.pages-name }}
+          ID_READBACK: ${{ steps.pages-id-first.outcome == 'success' && steps.pages-id-first.outputs.download-path || steps.pages-id-retry.outputs.download-path }}
+          NAME_READBACK: ${{ steps.pages-name-first.outcome == 'success' && steps.pages-name-first.outputs.download-path || steps.pages-name-retry.outputs.download-path }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_TAR" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$EXPECTED_NAME" =~ ^github-pages-[0-9]+-[0-9]+$ ]]
+          test -n "$ID_READBACK"
+          test -n "$NAME_READBACK"
+          for path in "$ID_READBACK/$EXPECTED_NAME" "$NAME_READBACK"; do
+            test -f "$path/artifact.tar"
+            digest=$(sha256sum "$path/artifact.tar")
+            test "${digest%% *}" = "$EXPECTED_TAR"
+          done
       - name: Require current main inside deployment lock
         env:
           GH_TOKEN: ${{ github.token }}
@@ -84,3 +157,5 @@ jobs:
       - name: Deploy verified manual
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
+        with:
+          artifact_name: ${{ needs.build.outputs.pages-name }}
