@@ -14,14 +14,18 @@ Offline:
   (no steps, no secrets, no cancel-in-progress, minimal permissions);
 - the real `if:` is evaluated over a timeline of pushes and Test completions.
 LIVINGPROOF_NETWORK=1 also checks the pinned shared workflow still checks out GITHUB_SHA
-and still refuses to run when HEAD is not GITHUB_SHA, which is what makes "release the
-commit that Test passed on" hold without an explicit `ref:`.
+and still refuses a checkout that is not the triggering commit. That refusal lives in
+plan.mjs. run.mjs passes GITHUB_SHA as expected for a non-candidate run by calling
+planVersion. A later git fetch may update only the release tag, and must throw unless
+that tag still peels to the planned commit. Together with the gate, that releases the
+commit Test passed on, with no explicit checkout `ref:`.
 """
 
 from __future__ import annotations
 
 import os
 import re
+import shlex
 import urllib.request
 from pathlib import Path
 
@@ -288,12 +292,526 @@ def _raw(path: str) -> str:
         return response.read().decode()
 
 
+# The pinned scripts may wrap or requote this guard. The substance is fixed:
+# plan.mjs reads HEAD, and run.mjs feeds it GITHUB_SHA on a non-candidate run.
+_HEAD_MISMATCH = "Checked-out HEAD must match the triggering commit"
+_JS_IDENT = r"[A-Za-z_$][\w$]*"
+_GITHUB_SHA_EXPR = re.compile(r"""process\.env(?:\.GITHUB_SHA|\[\s*(['"])GITHUB_SHA\1\s*\])""")
+_CANDIDATE_TRUE = frozenset({"candidate", "candidate===true", "candidate==true"})
+_CANDIDATE_FALSE = frozenset({"!candidate", "candidate===false", "candidate==false"})
+
+
+def _normalize_js(source: str) -> str:
+    """Collapse whitespace and drop comments, leaving string literals intact."""
+    out: list[str] = []
+    i = 0
+    n = len(source)
+    pending_space = False
+
+    def emit_space() -> None:
+        nonlocal pending_space
+        if pending_space and out and not out[-1].isspace():
+            out.append(" ")
+        pending_space = False
+
+    while i < n:
+        ch = source[i]
+        nxt = source[i + 1] if i + 1 < n else ""
+        if ch == "/" and nxt == "/":
+            i += 2
+            while i < n and source[i] not in "\r\n":
+                i += 1
+            pending_space = True
+            continue
+        if ch == "/" and nxt == "*":
+            i += 2
+            while i + 1 < n and source[i : i + 2] != "*/":
+                i += 1
+            i = min(i + 2, n)
+            pending_space = True
+            continue
+        if ch in "'\"`":
+            emit_space()
+            quote = ch
+            out.append(ch)
+            i += 1
+            while i < n:
+                c = source[i]
+                out.append(c)
+                i += 1
+                if c == "\\":
+                    if i < n:
+                        out.append(source[i])
+                        i += 1
+                    continue
+                if c == quote:
+                    break
+            continue
+        if ch.isspace():
+            pending_space = True
+            i += 1
+            continue
+        emit_space()
+        out.append(ch)
+        i += 1
+    return "".join(out).strip()
+
+
+def _is_github_sha(expr: str) -> bool:
+    return _GITHUB_SHA_EXPR.fullmatch(expr.strip()) is not None
+
+
+def _unwrap(expr: str) -> str:
+    expr = expr.strip()
+    while expr.startswith("(") and expr.endswith(")"):
+        depth = 0
+        wraps = True
+        for index, ch in enumerate(expr):
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0 and index != len(expr) - 1:
+                    wraps = False
+                    break
+        if not wraps or depth != 0:
+            break
+        expr = expr[1:-1].strip()
+    return expr
+
+
+def _split_ternary(expr: str) -> tuple[str, str, str] | None:
+    """Split one top-level ``cond ? when_true : when_false`` expression."""
+    depth = 0
+    question = None
+    for index, ch in enumerate(expr):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif depth == 0 and ch == "?" and question is None:
+            question = index
+        elif depth == 0 and ch == ":" and question is not None:
+            return (
+                expr[:question].strip(),
+                expr[question + 1 : index].strip(),
+                expr[index + 1 :].strip(),
+            )
+    return None
+
+
+def _selects_github_sha_for_non_candidate(expr: str) -> bool:
+    """True when the non-candidate arm is GITHUB_SHA and the candidate arm is not."""
+    parts = _split_ternary(_unwrap(expr))
+    if parts is None:
+        return False
+    cond, when_true, when_false = (_unwrap(part) for part in parts)
+    cond_flat = re.sub(r"\s+", "", cond)
+    if cond_flat in _CANDIDATE_TRUE:
+        non_candidate, candidate_arm = when_false, when_true
+    elif cond_flat in _CANDIDATE_FALSE:
+        non_candidate, candidate_arm = when_true, when_false
+    else:
+        return False
+    return _is_github_sha(non_candidate) and not _is_github_sha(candidate_arm)
+
+
+def _split_args(source: str) -> list[str]:
+    args: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for ch in source:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            args.append("".join(current).strip())
+            current = []
+            continue
+        current.append(ch)
+    tail = "".join(current).strip()
+    if tail:
+        args.append(tail)
+    return args
+
+
+def _call_arg_lists(text: str, callee: str) -> list[list[str]]:
+    found: list[list[str]] = []
+    start = 0
+    while True:
+        at = text.find(callee, start)
+        if at < 0:
+            break
+        before = text[at - 1] if at else ""
+        after = text[at + len(callee) : at + len(callee) + 1]
+        if before.isalnum() or before in "_$" or after.isalnum() or after in "_$":
+            start = at + len(callee)
+            continue
+        if text[:at].rstrip().endswith("function"):
+            start = at + len(callee)
+            continue
+        cursor = at + len(callee)
+        while cursor < len(text) and text[cursor].isspace():
+            cursor += 1
+        if cursor >= len(text) or text[cursor] != "(":
+            start = at + len(callee)
+            continue
+        depth = 1
+        cursor += 1
+        arg_at = cursor
+        while cursor < len(text) and depth:
+            if text[cursor] in "([{":
+                depth += 1
+            elif text[cursor] in ")]}":
+                depth -= 1
+            cursor += 1
+        if depth != 0:
+            break
+        found.append(_split_args(text[arg_at : cursor - 1]))
+        start = cursor
+    return found
+
+
+def _imported_plan_callees(text: str) -> list[str]:
+    callees: list[str] = []
+    named = re.compile(r"import\s*\{(?P<body>[^}]*)\}\s*from\s*(['\"])\./plan\.mjs\2")
+    for match in named.finditer(text):
+        for part in match.group("body").split(","):
+            binding = re.fullmatch(
+                rf"planVersion(?:\s+as\s+({_JS_IDENT}))?",
+                part.strip(),
+            )
+            if binding:
+                callees.append(binding.group(1) or "planVersion")
+    namespace = re.compile(rf"import\s*\*\s*as\s+({_JS_IDENT})\s*from\s*(['\"])\./plan\.mjs\2")
+    for match in namespace.finditer(text):
+        callees.append(f"{match.group(1)}.planVersion")
+    return callees
+
+
+def _initializer(text: str, name: str) -> str | None:
+    match = re.search(
+        rf"\b(?:const|let|var)\s+{re.escape(name)}\s*=\s*(?P<expr>[^;]+)",
+        text,
+    )
+    return match.group("expr").strip() if match else None
+
+
+def _if_else_selects_github_sha(text: str, name: str) -> bool:
+    """True when if/else assigns GITHUB_SHA on the non-candidate path only."""
+    ident = re.escape(name)
+    forms = (
+        (
+            rf"if\s*\(\s*candidate\s*\)\s*\{{?\s*{ident}\s*=\s*(?P<yes>[^;]+);\s*\}}?\s*"
+            rf"else\s*\{{?\s*{ident}\s*=\s*(?P<no>[^;]+);",
+            "no",
+            "yes",
+        ),
+        (
+            rf"if\s*\(\s*!\s*candidate\s*\)\s*\{{?\s*{ident}\s*=\s*(?P<no>[^;]+);\s*\}}?\s*"
+            rf"else\s*\{{?\s*{ident}\s*=\s*(?P<yes>[^;]+);",
+            "no",
+            "yes",
+        ),
+    )
+    for pattern, sha_side, other_side in forms:
+        match = re.search(pattern, text)
+        if match and _is_github_sha(_unwrap(match.group(sha_side))):
+            return not _is_github_sha(_unwrap(match.group(other_side)))
+    return False
+
+
+def _expr_passes_github_sha(text: str, expr: str) -> bool:
+    expr = _unwrap(expr)
+    if _selects_github_sha_for_non_candidate(expr):
+        return True
+    if re.fullmatch(_JS_IDENT, expr):
+        initial = _initializer(text, expr)
+        if initial is not None:
+            return _selects_github_sha_for_non_candidate(initial)
+        return _if_else_selects_github_sha(text, expr)
+    return False
+
+
+def _assert_plan_refuses_head_mismatch(source: str) -> None:
+    """plan.mjs throws the HEAD-mismatch error when checked-out commit !== expected."""
+    text = _normalize_js(source)
+    reads_head = re.search(
+        r"\b(?:const|let|var)\s+commit\s*=\s*[^;]*"
+        r"""['"]rev-parse['"]\s*,\s*['"]HEAD['"]""",
+        text,
+    )
+    assert reads_head, "plan.mjs must bind commit from git rev-parse HEAD"
+    guard = re.search(
+        r"if\s*\([^;]*?(?:\bcommit\s*!==\s*expected\b|\bexpected\s*!==\s*commit\b)"
+        r"[^;]*?\)\s*\{?\s*throw\s+(?:new\s+)?Error\s*\(\s*"
+        + r"""(['"`])"""
+        + re.escape(_HEAD_MISMATCH)
+        + r"\1",
+        text,
+        re.DOTALL,
+    )
+    assert guard, f"plan.mjs must throw {_HEAD_MISMATCH!r} when commit !== expected"
+
+
+def _assert_run_passes_github_sha(source: str) -> None:
+    """run.mjs imports planVersion and passes GITHUB_SHA for non-candidate runs."""
+    text = _normalize_js(source)
+    callees = _imported_plan_callees(text)
+    assert callees, "run.mjs must import planVersion from ./plan.mjs"
+    passed = any(
+        len(args) >= 2 and _expr_passes_github_sha(text, args[1])
+        for callee in callees
+        for args in _call_arg_lists(text, callee)
+    )
+    assert passed, (
+        "run.mjs must call planVersion with GITHUB_SHA as expected when the run is not a candidate"
+    )
+
+
+# git fetch here is a post-publish tag check, not a second checkout. These commands
+# would move HEAD or the current branch; a tag-to-tag fetch does not.
+_HEAD_MOVING_GIT = frozenset(
+    {"pull", "checkout", "switch", "reset", "merge", "rebase", "update-ref"}
+)
+_FETCH_FLAGS = frozenset({"--force", "-f"})
+
+
+def _match_closer(text: str, open_at: int, opener: str, closer: str) -> int | None:
+    """Index of the bracket matching ``text[open_at]``, skipping string literals."""
+    if open_at >= len(text) or text[open_at] != opener:
+        return None
+    depth = 0
+    i = open_at
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if ch in "'\"`":
+            i += 1
+            while i < n:
+                if text[i] == "\\":
+                    i += 2
+                    continue
+                if text[i] == ch:
+                    i += 1
+                    break
+                i += 1
+            continue
+        if ch == opener:
+            depth += 1
+        elif ch == closer:
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return None
+
+
+def _unquote_js(token: str) -> str | None:
+    token = token.strip()
+    if len(token) < 2 or token[0] not in "'\"`" or token[-1] != token[0]:
+        return None
+    return token[1:-1]
+
+
+def _positional_params(param_src: str) -> tuple[str, ...]:
+    names: list[str] = []
+    for part in _split_args(param_src):
+        part = part.strip()
+        if not part or part[0] in "{[":
+            break
+        name = part.split("=", 1)[0].strip()
+        if not re.fullmatch(_JS_IDENT, name):
+            break
+        names.append(name)
+    return tuple(names)
+
+
+def _js_functions(text: str) -> list[tuple[str, tuple[str, ...], str, int, int]]:
+    found: list[tuple[str, tuple[str, ...], str, int, int]] = []
+    for match in re.finditer(rf"\bfunction\s+({_JS_IDENT})\s*\(", text):
+        paren = match.end() - 1
+        close = _match_closer(text, paren, "(", ")")
+        if close is None:
+            continue
+        brace = close + 1
+        while brace < len(text) and text[brace].isspace():
+            brace += 1
+        if brace >= len(text) or text[brace] != "{":
+            continue
+        end = _match_closer(text, brace, "{", "}")
+        if end is None:
+            continue
+        found.append(
+            (
+                match.group(1),
+                _positional_params(text[paren + 1 : close]),
+                text[brace + 1 : end],
+                match.start(),
+                end,
+            )
+        )
+    return found
+
+
+def _js_string_values(text: str) -> list[tuple[int, str]]:
+    values: list[tuple[int, str]] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] not in "'\"`":
+            i += 1
+            continue
+        start = i
+        quote = text[i]
+        i += 1
+        chars: list[str] = []
+        while i < n:
+            if text[i] == "\\":
+                if i + 1 < n:
+                    chars.append(text[i + 1])
+                i += 2
+                continue
+            if text[i] == quote:
+                i += 1
+                break
+            chars.append(text[i])
+            i += 1
+        values.append((start, "".join(chars)))
+    return values
+
+
+def _git_arg_lists(text: str) -> list[tuple[int, list[str] | None]]:
+    """Argument lists passed to git. None means an argument was not a literal."""
+    found: list[tuple[int, list[str] | None]] = []
+    for match in re.finditer(r"""(['"])git\1\s*,\s*\[""", text):
+        bracket = match.end() - 1
+        close = _match_closer(text, bracket, "[", "]")
+        if close is None:
+            found.append((match.start(), None))
+            continue
+        args: list[str] | None = []
+        for raw in _split_args(text[bracket + 1 : close]):
+            literal = _unquote_js(raw)
+            if literal is None or args is None:
+                args = None
+                break
+            args.append(literal)
+        found.append((match.start(), args))
+    for pos, value in _js_string_values(text):
+        if not re.match(r"git\s+\S", value):
+            continue
+        try:
+            parts = shlex.split(value)
+        except ValueError:
+            found.append((pos, None))
+            continue
+        if not parts or parts[0] != "git":
+            found.append((pos, None))
+            continue
+        found.append((pos, parts[1:]))
+    return found
+
+
+def _is_plan_commit(text: str, expr: str) -> bool:
+    expr = _unwrap(expr)
+    if expr == "plan.commit":
+        return True
+    if re.fullmatch(_JS_IDENT, expr) is None:
+        return False
+    initial = _initializer(text, expr)
+    return initial is not None and _unwrap(initial) == "plan.commit"
+
+
+def _tag_to_tag_refspec(refspec: str, tag_param: str) -> bool:
+    body = refspec.removeprefix("+")
+    same = f"refs/tags/${{{tag_param}}}:refs/tags/${{{tag_param}}}"
+    return re.sub(r"\s+", "", body) == same and "refs/heads" not in body
+
+
+def _fetch_refspec(args: list[str], tag_param: str) -> str:
+    flags = [arg for arg in args[1:] if arg.startswith("-")]
+    positionals = [arg for arg in args[1:] if not arg.startswith("-")]
+    assert set(flags) <= _FETCH_FLAGS, f"git fetch flags {flags} are not limited to a tag update"
+    assert "--update-head-ok" not in args
+    if len(positionals) == 2:
+        remote, refspec = positionals
+        assert ":" not in remote and not remote.startswith("refs/"), remote
+    elif len(positionals) == 1:
+        refspec = positionals[0]
+    else:
+        raise AssertionError(f"git fetch arguments {positionals} are not one tag refspec")
+    assert _tag_to_tag_refspec(refspec, tag_param), (
+        f"git fetch refspec {refspec!r} must copy only refs/tags/${{{tag_param}}} onto itself"
+    )
+    return refspec
+
+
+def _peeled_tag_var(body: str, tag_param: str) -> str | None:
+    needle = f"refs/tags/${{{tag_param}}}^{{commit}}"
+    assign = re.compile(rf"\b(?:const|let|var)\s+(?P<var>{_JS_IDENT})\s*=\s*(?P<expr>[^;]*);")
+    for match in assign.finditer(body):
+        expr = re.sub(r"\s+", "", match.group("expr"))
+        if "rev-parse" in expr and needle in expr:
+            return match.group("var")
+    return None
+
+
+def _assert_fetches_stay_on_planned_commit(source: str) -> None:
+    """A git fetch may update only the release tag, then must match plan.commit.
+
+    planVersion has already refused a HEAD that is not the expected commit. The fetch
+    runs after publish and must not select a different commit: its refspec writes
+    refs/tags/<tag> and the function throws unless that tag peels to plan.commit.
+    """
+    text = _normalize_js(source)
+    commands = _git_arg_lists(text)
+    fetches: list[tuple[int, list[str]]] = []
+    for pos, args in commands:
+        assert args is not None, "run.mjs git invocation must use literal arguments"
+        subcommand = next((arg for arg in args if not arg.startswith("-")), None)
+        assert subcommand not in _HEAD_MOVING_GIT, (
+            f"git {subcommand} can change the checked-out commit"
+        )
+        if subcommand == "fetch":
+            fetches.append((pos, args))
+    assert fetches, "run.mjs's git fetch must be visible to this check"
+    functions = _js_functions(text)
+    for pos, args in fetches:
+        owners = [fn for fn in functions if fn[3] <= pos <= fn[4]]
+        assert owners, "git fetch must be inside the function that verifies the tag"
+        name, params, body, _start, _end = min(owners, key=lambda fn: fn[4] - fn[3])
+        assert len(params) >= 2, "tag verification must take the tag and the expected commit"
+        tag_param, expected_param = params[0], params[1]
+        _fetch_refspec(args, tag_param)
+        peeled = _peeled_tag_var(body, tag_param)
+        assert peeled, "the fetched tag must be peeled with git rev-parse ^{commit}"
+        guard = re.search(
+            rf"if\s*\([^;]*?(?:\b{peeled}\s*!==\s*{re.escape(expected_param)}\b|"
+            rf"\b{re.escape(expected_param)}\s*!==\s*{peeled}\b)"
+            rf"[^;]*?\)\s*\{{?\s*throw\b",
+            body,
+        )
+        assert guard, f"tag verification must throw when {peeled} !== {expected_param}"
+        calls = _call_arg_lists(text, name)
+        assert calls, f"{name} must be called with the planned commit"
+        for call in calls:
+            assert len(call) >= 2 and _is_plan_commit(text, call[1]), (
+                "tag verification must compare the tag to plan.commit, "
+                "the commit planVersion already checked"
+            )
+
+
 @pytest.mark.skipif(not os.environ.get("LIVINGPROOF_NETWORK"), reason="set LIVINGPROOF_NETWORK=1")
 def test_pinned_shared_workflow_releases_exactly_github_sha() -> None:
-    """With head_sha == github.sha required by the gate, these two facts mean: tag the tested commit.
+    """Checkout is GITHUB_SHA, and a non-candidate run refuses any other HEAD.
 
-    A Renovate bump of the guidelines tag that changes either one must be reviewed together
-    with this gate.
+    plan.mjs throws when the checked-out commit is not the expected commit. run.mjs
+    imports planVersion and passes GITHUB_SHA as that expected commit when the run is
+    not a candidate. Its git fetch only updates the published tag and throws unless
+    that tag peels to plan.commit. The pin is the ref on this repo's release workflow.
+    A guidelines bump that drops any of these has to be reviewed together with this gate.
     """
     workflow = yaml.safe_load(_raw(".github/workflows/semantic-release.yml"))
     steps = workflow["jobs"]["release"]["steps"]
@@ -304,6 +822,7 @@ def test_pinned_shared_workflow_releases_exactly_github_sha() -> None:
     assert checkout["with"].get("persist-credentials") is False
     assert workflow["jobs"]["release"]["if"] == "github.ref == 'refs/heads/main'"
     runner = _raw(".github/actions/semantic-release/run.mjs")
-    assert "process.env.GITHUB_SHA" in runner
-    assert "Checked-out HEAD must match the triggering commit" in runner
-    assert "git fetch" not in runner and "git pull" not in runner
+    plan = _raw(".github/actions/semantic-release/plan.mjs")
+    _assert_plan_refuses_head_mismatch(plan)
+    _assert_run_passes_github_sha(runner)
+    _assert_fetches_stay_on_planned_commit(runner)
