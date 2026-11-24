@@ -2,10 +2,11 @@
 """collaboration-guidelines bumps move every consumer pin together and keep the release interface.
 
 Proposed by Vera in the capability-verifier#72 review (guidelines bump checklist items 2, 3 and 6),
-adapted for this repository. Offline: the shared release interface is recorded here and checked
-against the workflow call when this repo has one. When a guidelines release changes
-`semantic-release.yml` inputs or outputs, update SHARED_RELEASE_* in the same PR, after reading
-the diff. LIVINGPROOF_NETWORK=1 also compares them with the pinned tag.
+adapted for this repository. SHARED_RELEASE_* is the floor the pinned semantic-release.yml must
+still declare. LIVINGPROOF_NETWORK=1 reads that file at the pinned tag and parses its full input
+and output interface; callers are checked against the parsed interface. Offline, callers are
+checked against the floor. Adding an input or output upstream does not require editing
+SHARED_RELEASE_*. Removing a recorded key does.
 """
 
 from __future__ import annotations
@@ -26,6 +27,8 @@ USES = re.compile(
     re.MULTILINE,
 )
 PRESET = re.compile(rf"^github>{REPO}:renovate-preset#(?P<ref>.+)$")
+# Floor the pinned semantic-release.yml must keep declaring. The full interface is
+# parsed from that file at the pinned tag (see shared_release_interface).
 SHARED_RELEASE_INPUTS = {"dry-run", "draft-release"}
 SHARED_RELEASE_OUTPUTS = {
     "draft-created",
@@ -112,6 +115,64 @@ def _workflow_call_keys(shared: str, section: str) -> set[str]:
     return set(re.findall(r"^      ([A-Za-z0-9_-]+):", found.group(1), re.MULTILINE))
 
 
+def pinned_semantic_release_text() -> str:
+    refs = {match.group("ref") for match in guideline_calls().values()}
+    (ref,) = refs
+    url = f"https://raw.githubusercontent.com/{REPO}/{ref}/.github/workflows/semantic-release.yml"
+    with urllib.request.urlopen(url, timeout=30) as response:
+        return response.read().decode()
+
+
+def shared_release_interface(shared: str | None = None) -> tuple[set[str], set[str]]:
+    """Inputs and outputs callers may use.
+
+    `shared` is the pinned workflow text. The recorded floor must still be present,
+    and every other key that file declares is part of the interface. Without the
+    file, the floor itself is the interface.
+    """
+    if shared is None:
+        return set(SHARED_RELEASE_INPUTS), set(SHARED_RELEASE_OUTPUTS)
+    inputs = _workflow_call_keys(shared, "inputs")
+    outputs = _workflow_call_keys(shared, "outputs")
+    missing_inputs = SHARED_RELEASE_INPUTS - inputs
+    missing_outputs = SHARED_RELEASE_OUTPUTS - outputs
+    assert not missing_inputs, sorted(missing_inputs)
+    assert not missing_outputs, sorted(missing_outputs)
+    return inputs, outputs
+
+
+def release_interface() -> tuple[set[str], set[str]]:
+    if os.environ.get("LIVINGPROOF_NETWORK"):
+        return shared_release_interface(pinned_semantic_release_text())
+    return shared_release_interface(None)
+
+
+def assert_callers_use_interface(text: str, inputs: set[str], outputs: set[str]) -> None:
+    calls = guideline_calls(text)
+    assert calls, "expected a job that uses the shared semantic-release workflow"
+    for name, match in calls.items():
+        assert match.group("file") == "semantic-release.yml"
+        block = _job_block(text, name)
+        used_inputs = set(_mapping(block, "with"))
+        assert used_inputs <= inputs, sorted(used_inputs - inputs)
+        assert _mapping(block, "permissions").get("contents") == "write"
+        used_outputs = set(re.findall(rf"needs\.{re.escape(name)}\.outputs\.([\w-]+)", text))
+        assert used_outputs <= outputs, sorted(used_outputs - outputs)
+
+
+def _shared_workflow(inputs: set[str], outputs: set[str]) -> str:
+    def keys(names: set[str]) -> str:
+        return "".join(f"      {name}:\n        description: recorded\n" for name in sorted(names))
+
+    return (
+        "name: Shared semantic release\n"
+        "on:\n"
+        "  workflow_call:\n"
+        f"    inputs:\n{keys(inputs)}"
+        f"    outputs:\n{keys(outputs)}"
+    )
+
+
 def test_every_guidelines_pin_is_a_full_release_tag():
     refs = pinned_versions()
     assert refs, "expected a Renovate preset pin and/or a release workflow call"
@@ -139,17 +200,9 @@ def test_mismatched_pins_are_reported():
     workflow_path() is None, reason="this repository has no guidelines workflow call"
 )
 def test_release_call_uses_only_the_shared_interface():
-    path = workflow_path()
-    text = path.read_text()
-    calls = guideline_calls(text)
-    assert calls, "expected a job that uses the shared semantic-release workflow"
-    for name, match in calls.items():
-        assert match.group("file") == "semantic-release.yml"
-        block = _job_block(text, name)
-        assert set(_mapping(block, "with")) <= SHARED_RELEASE_INPUTS
-        assert _mapping(block, "permissions").get("contents") == "write"
-        used = set(re.findall(rf"needs\.{re.escape(name)}\.outputs\.([\w-]+)", text))
-        assert used <= SHARED_RELEASE_OUTPUTS, sorted(used - SHARED_RELEASE_OUTPUTS)
+    text = workflow_path().read_text()
+    inputs, outputs = release_interface()
+    assert_callers_use_interface(text, inputs, outputs)
 
 
 @pytest.mark.skipif(
@@ -166,7 +219,66 @@ def test_an_unknown_release_output_is_reported():
     )
     found = set(re.findall(r"needs\.release\.outputs\.([\w-]+)", mutated))
     assert "tag" in found
-    assert found - SHARED_RELEASE_OUTPUTS >= {"tag"}
+    inputs, outputs = release_interface()
+    with pytest.raises(AssertionError, match="'tag'"):
+        assert_callers_use_interface(mutated, inputs, outputs)
+
+
+def test_shared_interface_is_parsed_from_the_workflow_text():
+    extra = {"expected-version", "expected-commit"}
+    shared = _shared_workflow(SHARED_RELEASE_INPUTS | extra, set(SHARED_RELEASE_OUTPUTS))
+    inputs, outputs = shared_release_interface(shared)
+    assert inputs == _workflow_call_keys(shared, "inputs")
+    assert outputs == _workflow_call_keys(shared, "outputs")
+    assert extra <= inputs - SHARED_RELEASE_INPUTS
+    assert outputs == SHARED_RELEASE_OUTPUTS
+
+
+def test_callers_are_checked_against_the_parsed_interface():
+    """A caller may use a key the pinned workflow declares and the floor does not record."""
+    extra_inputs = {"expected-version", "expected-commit"}
+    extra_output = "future-output"
+    shared = _shared_workflow(
+        SHARED_RELEASE_INPUTS | extra_inputs,
+        set(SHARED_RELEASE_OUTPUTS) | {extra_output},
+    )
+    inputs, outputs = shared_release_interface(shared)
+    caller = (
+        "jobs:\n"
+        "  release:\n"
+        "    permissions:\n"
+        "      contents: write\n"
+        "    uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/"
+        "semantic-release.yml@v9.9.10\n"
+        "    with:\n"
+        "      expected-version: v1.2.3\n"
+        "      expected-commit: abcdef\n"
+        "  deploy:\n"
+        "    needs: release\n"
+        "    if: needs.release.outputs.future-output == 'true'\n"
+    )
+    assert extra_inputs - SHARED_RELEASE_INPUTS
+    assert extra_output not in SHARED_RELEASE_OUTPUTS
+    assert_callers_use_interface(caller, inputs, outputs)
+    unknown_input = caller.replace("expected-commit: abcdef", "not-a-real-input: abcdef")
+    with pytest.raises(AssertionError, match="'not-a-real-input'"):
+        assert_callers_use_interface(unknown_input, inputs, outputs)
+    unknown_output = caller.replace("future-output", "not-an-output")
+    with pytest.raises(AssertionError, match="'not-an-output'"):
+        assert_callers_use_interface(unknown_output, inputs, outputs)
+
+
+def test_parsed_interface_must_keep_the_recorded_floor():
+    missing_input = _shared_workflow(
+        SHARED_RELEASE_INPUTS - {"dry-run"}, set(SHARED_RELEASE_OUTPUTS)
+    )
+    with pytest.raises(AssertionError, match="'dry-run'"):
+        shared_release_interface(missing_input)
+    missing_output = _shared_workflow(
+        set(SHARED_RELEASE_INPUTS), set(SHARED_RELEASE_OUTPUTS) - {"version"}
+    )
+    with pytest.raises(AssertionError, match="'version'"):
+        shared_release_interface(missing_output)
 
 
 @pytest.mark.skipif(not os.environ.get("LIVINGPROOF_NETWORK"), reason="set LIVINGPROOF_NETWORK=1")
@@ -174,13 +286,18 @@ def test_an_unknown_release_output_is_reported():
     workflow_path() is None, reason="this repository has no guidelines workflow call"
 )
 def test_recorded_interface_matches_the_pinned_shared_workflow():
-    refs = {match.group("ref") for match in guideline_calls().values()}
-    (ref,) = refs
-    url = f"https://raw.githubusercontent.com/{REPO}/{ref}/.github/workflows/semantic-release.yml"
-    with urllib.request.urlopen(url, timeout=30) as response:
-        shared = response.read().decode()
-    assert _workflow_call_keys(shared, "inputs") == SHARED_RELEASE_INPUTS
-    assert _workflow_call_keys(shared, "outputs") == SHARED_RELEASE_OUTPUTS
+    shared = pinned_semantic_release_text()
+    parsed_inputs = _workflow_call_keys(shared, "inputs")
+    parsed_outputs = _workflow_call_keys(shared, "outputs")
+    inputs, outputs = release_interface()
+    assert inputs == parsed_inputs
+    assert outputs == parsed_outputs
+    assert SHARED_RELEASE_INPUTS <= inputs
+    assert SHARED_RELEASE_OUTPUTS <= outputs
+    # Writer inputs live on the pinned file. Recording only the floor keeps the next
+    # added key from failing this test; exact equality with the floor would fail it.
+    assert {"expected-version", "expected-commit"} <= inputs - SHARED_RELEASE_INPUTS
+    assert_callers_use_interface(workflow_path().read_text(), inputs, outputs)
 
 
 def test_this_repository_does_not_opt_in_to_docs_brand_updates():
