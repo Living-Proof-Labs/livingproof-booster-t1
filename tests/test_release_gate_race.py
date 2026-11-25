@@ -806,14 +806,18 @@ def _assert_fetches_stay_on_planned_commit(source: str) -> None:
         tag_param, expected_param = params[0], params[1]
         _fetch_refspec(args, tag_param)
         peeled = _peeled_tag_var(body, tag_param)
-        assert peeled, "the fetched tag must be peeled with git rev-parse ^{commit}"
-        guard = re.search(
-            rf"if\s*\([^;]*?(?:\b{peeled}\s*!==\s*{re.escape(expected_param)}\b|"
-            rf"\b{re.escape(expected_param)}\s*!==\s*{peeled}\b)"
-            rf"[^;]*?\)\s*\{{?\s*throw\b",
-            body,
+        guard = None
+        if peeled:
+            guard = re.search(
+                rf"if\s*\([^;]*?(?:\b{peeled}\s*!==\s*{re.escape(expected_param)}\b|"
+                rf"\b{re.escape(expected_param)}\s*!==\s*{peeled}\b)"
+                rf"[^;]*?\)\s*\{{?\s*throw\b",
+                body,
+            )
+        assert peeled and guard, (
+            "the fetched tag must be peeled with git rev-parse ^{commit} "
+            "and throw when that commit !== the expected commit"
         )
-        assert guard, f"tag verification must throw when {peeled} !== {expected_param}"
         calls = _call_arg_lists(text, name)
         assert calls, f"{name} must be called with the planned commit"
         for call in calls:
@@ -899,6 +903,15 @@ _RUN_BRANCH_FETCH = _RUN_FIXTURE.replace(
     "`refs/tags/${gitTag}:refs/tags/${gitTag}`",
     "'refs/heads/main:refs/heads/main'",
 )
+_RUN_WITHOUT_PEEL_COMPARE = _RUN_FIXTURE.replace(
+    "  if (taggedCommit !== expectedCommit) {\n    throw new Error('tag moved');\n  }\n",
+    "",
+)
+_RUN_WITH_CHECKOUT = _RUN_FIXTURE.replace(
+    "export function verifyTagMatchesCommit(gitTag, expectedCommit) {\n",
+    "export function verifyTagMatchesCommit(gitTag, expectedCommit) {\n"
+    "  execFileSync('git', ['checkout', 'main']);\n",
+)
 
 
 def test_offline_fixture_accepts_head_guard_github_sha_and_tag_fetch() -> None:
@@ -946,6 +959,16 @@ def test_offline_fixture_refuses_a_run_missing_the_tag_fetch() -> None:
 def test_offline_fixture_refuses_a_branch_fetch() -> None:
     with pytest.raises(AssertionError):
         _assert_fetches_stay_on_planned_commit(_RUN_BRANCH_FETCH)
+
+
+def test_offline_fixture_refuses_a_run_missing_the_tag_peel_comparison() -> None:
+    with pytest.raises(AssertionError):
+        _assert_fetches_stay_on_planned_commit(_RUN_WITHOUT_PEEL_COMPARE)
+
+
+def test_offline_fixture_refuses_a_git_checkout() -> None:
+    with pytest.raises(AssertionError):
+        _assert_fetches_stay_on_planned_commit(_RUN_WITH_CHECKOUT)
 
 
 @pytest.mark.skipif(not os.environ.get("LIVINGPROOF_NETWORK"), reason="set LIVINGPROOF_NETWORK=1")
