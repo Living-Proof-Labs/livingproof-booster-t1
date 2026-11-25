@@ -17,8 +17,9 @@ LIVINGPROOF_NETWORK=1 also checks the pinned shared workflow still checks out GI
 and still refuses a checkout that is not the triggering commit. That refusal lives in
 plan.mjs. run.mjs passes GITHUB_SHA as expected for a non-candidate run by calling
 planVersion. A later git fetch may update only the release tag, and must throw unless
-that tag still peels to the planned commit. Together with the gate, that releases the
-commit Test passed on, with no explicit checkout `ref:`.
+that tag still peels to the planned commit. Offline fixtures exercise those three checks
+with no network, so CI runs them. Together with the gate, that releases the commit Test
+passed on, with no explicit checkout `ref:`.
 """
 
 from __future__ import annotations
@@ -400,7 +401,24 @@ def _split_ternary(expr: str) -> tuple[str, str, str] | None:
     return None
 
 
-def _selects_github_sha_for_non_candidate(expr: str) -> bool:
+def _resolves_to_github_sha(text: str, expr: str, seen: frozenset[str] = frozenset()) -> bool:
+    """True when expr is GITHUB_SHA, including through a local binding.
+
+    `const sha = process.env.GITHUB_SHA` then using `sha` on the non-candidate
+    arm is the same commit. The candidate arm must still be some other value.
+    """
+    expr = _unwrap(expr)
+    if _is_github_sha(expr):
+        return True
+    if not re.fullmatch(_JS_IDENT, expr) or expr in seen:
+        return False
+    initial = _initializer(text, expr)
+    if initial is None:
+        return False
+    return _resolves_to_github_sha(text, initial, seen | {expr})
+
+
+def _selects_github_sha_for_non_candidate(text: str, expr: str) -> bool:
     """True when the non-candidate arm is GITHUB_SHA and the candidate arm is not."""
     parts = _split_ternary(_unwrap(expr))
     if parts is None:
@@ -413,7 +431,9 @@ def _selects_github_sha_for_non_candidate(expr: str) -> bool:
         non_candidate, candidate_arm = when_true, when_false
     else:
         return False
-    return _is_github_sha(non_candidate) and not _is_github_sha(candidate_arm)
+    return _resolves_to_github_sha(text, non_candidate) and not _resolves_to_github_sha(
+        text, candidate_arm
+    )
 
 
 def _split_args(source: str) -> list[str]:
@@ -517,19 +537,19 @@ def _if_else_selects_github_sha(text: str, name: str) -> bool:
     )
     for pattern, sha_side, other_side in forms:
         match = re.search(pattern, text)
-        if match and _is_github_sha(_unwrap(match.group(sha_side))):
-            return not _is_github_sha(_unwrap(match.group(other_side)))
+        if match and _resolves_to_github_sha(text, match.group(sha_side)):
+            return not _resolves_to_github_sha(text, match.group(other_side))
     return False
 
 
 def _expr_passes_github_sha(text: str, expr: str) -> bool:
     expr = _unwrap(expr)
-    if _selects_github_sha_for_non_candidate(expr):
+    if _selects_github_sha_for_non_candidate(text, expr):
         return True
     if re.fullmatch(_JS_IDENT, expr):
         initial = _initializer(text, expr)
         if initial is not None:
-            return _selects_github_sha_for_non_candidate(initial)
+            return _selects_github_sha_for_non_candidate(text, initial)
         return _if_else_selects_github_sha(text, expr)
     return False
 
@@ -801,6 +821,101 @@ def _assert_fetches_stay_on_planned_commit(source: str) -> None:
                 "tag verification must compare the tag to plan.commit, "
                 "the commit planVersion already checked"
             )
+
+
+# Offline stand-ins for the pinned scripts. CI does not set LIVINGPROOF_NETWORK, so the
+# network test never runs there. These fixtures call the same checks.
+_PLAN_FIXTURE = """\
+export async function planVersion(cwd, expected) {
+  const commit = git('rev-parse', 'HEAD').trim();
+  if (!shaPattern.test(expected ?? '') || commit !== expected) {
+    throw new Error('Checked-out HEAD must match the triggering commit');
+  }
+  return { commit };
+}
+"""
+
+_RUN_FIXTURE = """\
+import { planVersion } from './plan.mjs';
+
+export function verifyTagMatchesCommit(gitTag, expectedCommit) {
+  execFileSync('git', ['fetch', 'origin', `refs/tags/${gitTag}:refs/tags/${gitTag}`, '--force']);
+  const taggedCommit = execFileSync('git', ['rev-parse', '--verify', `refs/tags/${gitTag}^{commit}`]).trim();
+  if (taggedCommit !== expectedCommit) {
+    throw new Error('tag moved');
+  }
+}
+
+export async function run() {
+  const candidate = process.env.RELEASE_CANDIDATE === 'true';
+  const expected = candidate ? process.env.RELEASE_EXPECTED_COMMIT : process.env.GITHUB_SHA;
+  const plan = await planVersion(cwd, expected, { candidate });
+  const head = plan.commit;
+  verifyTagMatchesCommit(plan.gitTag, head);
+}
+"""
+
+_RUN_FIXTURE_SHA_LOCAL = _RUN_FIXTURE.replace(
+    "  const expected = candidate ? process.env.RELEASE_EXPECTED_COMMIT : process.env.GITHUB_SHA;",
+    "  const sha = process.env.GITHUB_SHA;\n"
+    "  const expected = candidate ? process.env.RELEASE_EXPECTED_COMMIT : sha;",
+)
+
+_PLAN_WITHOUT_COMPARISON = _PLAN_FIXTURE.replace(" || commit !== expected", "")
+_PLAN_WITHOUT_MESSAGE = _PLAN_FIXTURE.replace(
+    "Checked-out HEAD must match the triggering commit",
+    "checkout accepted",
+)
+_PLAN_WITHOUT_HEAD = _PLAN_FIXTURE.replace(
+    "const commit = git('rev-parse', 'HEAD').trim();",
+    "const commit = expected;",
+)
+_RUN_WITHOUT_GITHUB_SHA = _RUN_FIXTURE.replace(
+    "process.env.GITHUB_SHA",
+    "process.env.RELEASE_EXPECTED_COMMIT",
+)
+_RUN_WITHOUT_FETCH = _RUN_FIXTURE.replace(
+    "  execFileSync('git', ['fetch', 'origin', `refs/tags/${gitTag}:refs/tags/${gitTag}`, '--force']);\n",
+    "",
+)
+_RUN_BRANCH_FETCH = _RUN_FIXTURE.replace(
+    "`refs/tags/${gitTag}:refs/tags/${gitTag}`",
+    "'refs/heads/main:refs/heads/main'",
+)
+
+
+def test_offline_fixture_accepts_head_guard_github_sha_and_tag_fetch() -> None:
+    _assert_plan_refuses_head_mismatch(_PLAN_FIXTURE)
+    _assert_run_passes_github_sha(_RUN_FIXTURE)
+    _assert_fetches_stay_on_planned_commit(_RUN_FIXTURE)
+
+
+def test_offline_fixture_accepts_github_sha_bound_before_the_ternary() -> None:
+    _assert_run_passes_github_sha(_RUN_FIXTURE_SHA_LOCAL)
+
+
+@pytest.mark.parametrize(
+    "plan",
+    [_PLAN_WITHOUT_COMPARISON, _PLAN_WITHOUT_MESSAGE, _PLAN_WITHOUT_HEAD],
+)
+def test_offline_fixture_refuses_a_plan_missing_the_head_guard(plan: str) -> None:
+    with pytest.raises(AssertionError):
+        _assert_plan_refuses_head_mismatch(plan)
+
+
+def test_offline_fixture_refuses_a_run_missing_github_sha() -> None:
+    with pytest.raises(AssertionError):
+        _assert_run_passes_github_sha(_RUN_WITHOUT_GITHUB_SHA)
+
+
+def test_offline_fixture_refuses_a_run_missing_the_tag_fetch() -> None:
+    with pytest.raises(AssertionError):
+        _assert_fetches_stay_on_planned_commit(_RUN_WITHOUT_FETCH)
+
+
+def test_offline_fixture_refuses_a_branch_fetch() -> None:
+    with pytest.raises(AssertionError):
+        _assert_fetches_stay_on_planned_commit(_RUN_BRANCH_FETCH)
 
 
 @pytest.mark.skipif(not os.environ.get("LIVINGPROOF_NETWORK"), reason="set LIVINGPROOF_NETWORK=1")
