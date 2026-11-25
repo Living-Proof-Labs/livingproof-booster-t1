@@ -855,9 +855,26 @@ export async function run() {
 }
 """
 
+_EXPECTED_LINE = (
+    "  const expected = candidate ? process.env.RELEASE_EXPECTED_COMMIT : process.env.GITHUB_SHA;"
+)
 _RUN_FIXTURE_SHA_LOCAL = _RUN_FIXTURE.replace(
-    "  const expected = candidate ? process.env.RELEASE_EXPECTED_COMMIT : process.env.GITHUB_SHA;",
+    _EXPECTED_LINE,
     "  const sha = process.env.GITHUB_SHA;\n"
+    "  const expected = candidate ? process.env.RELEASE_EXPECTED_COMMIT : sha;",
+)
+_RUN_SHA_OTHER_VALUE = _RUN_FIXTURE.replace(
+    _EXPECTED_LINE,
+    "  const sha = process.env.RELEASE_EXPECTED_COMMIT;\n"
+    "  const expected = candidate ? process.env.RELEASE_EXPECTED_COMMIT : sha;",
+)
+_RUN_LITERAL_OTHER = _RUN_FIXTURE.replace(
+    _EXPECTED_LINE,
+    "  const expected = candidate"
+    " ? process.env.RELEASE_EXPECTED_COMMIT : 'not-the-triggering-commit';",
+)
+_RUN_UNBOUND_NAME = _RUN_FIXTURE.replace(
+    _EXPECTED_LINE,
     "  const expected = candidate ? process.env.RELEASE_EXPECTED_COMMIT : sha;",
 )
 
@@ -892,6 +909,19 @@ def test_offline_fixture_accepts_head_guard_github_sha_and_tag_fetch() -> None:
 
 def test_offline_fixture_accepts_github_sha_bound_before_the_ternary() -> None:
     _assert_run_passes_github_sha(_RUN_FIXTURE_SHA_LOCAL)
+
+
+@pytest.mark.parametrize(
+    "runner",
+    [
+        pytest.param(_RUN_SHA_OTHER_VALUE, id="alias-holds-release-expected-commit"),
+        pytest.param(_RUN_LITERAL_OTHER, id="literal-is-not-github-sha"),
+        pytest.param(_RUN_UNBOUND_NAME, id="name-has-no-binding"),
+    ],
+)
+def test_offline_fixture_refuses_a_non_candidate_arm_that_is_not_github_sha(runner: str) -> None:
+    with pytest.raises(AssertionError):
+        _assert_run_passes_github_sha(runner)
 
 
 @pytest.mark.parametrize(
