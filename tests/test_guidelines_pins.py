@@ -5,8 +5,9 @@ Proposed by Vera in the capability-verifier#72 review (guidelines bump checklist
 adapted for this repository. SHARED_RELEASE_* is the floor the pinned semantic-release.yml must
 still declare. LIVINGPROOF_NETWORK=1 reads that file at the pinned tag and parses its full input
 and output interface; callers are checked against the parsed interface. Offline, callers are
-checked against the floor. Adding an input or output upstream does not require editing
-SHARED_RELEASE_*. Removing a recorded key does.
+checked against the floor. CI does not set LIVINGPROOF_NETWORK, so an offline test drives that
+same fetch branch with a stand-in workflow. Adding an input or output upstream does not require
+editing SHARED_RELEASE_*. Removing a recorded key does.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import urllib.request
 from pathlib import Path
 
@@ -279,6 +281,50 @@ def test_parsed_interface_must_keep_the_recorded_floor():
     )
     with pytest.raises(AssertionError, match="'version'"):
         shared_release_interface(missing_output)
+
+
+def _patched_pin(monkeypatch: pytest.MonkeyPatch, shared: str) -> None:
+    """Run the fetch branch of release_interface without contacting GitHub.
+
+    CI never sets LIVINGPROOF_NETWORK. Setting it here, and replacing the fetch,
+    is what makes a revert of that branch fail the offline suite.
+    """
+    monkeypatch.setenv("LIVINGPROOF_NETWORK", "1")
+    monkeypatch.setattr(sys.modules[__name__], "pinned_semantic_release_text", lambda: shared)
+
+
+def test_fetch_branch_returns_keys_parsed_from_the_patched_workflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    extra_inputs = {"expected-version", "expected-commit"}
+    extra_outputs = {"future-output"}
+    shared = _shared_workflow(
+        SHARED_RELEASE_INPUTS | extra_inputs,
+        set(SHARED_RELEASE_OUTPUTS) | extra_outputs,
+    )
+    _patched_pin(monkeypatch, shared)
+    inputs, outputs = release_interface()
+    assert inputs == _workflow_call_keys(shared, "inputs")
+    assert outputs == _workflow_call_keys(shared, "outputs")
+    assert extra_inputs <= inputs - SHARED_RELEASE_INPUTS
+    assert extra_outputs <= outputs - SHARED_RELEASE_OUTPUTS
+
+
+def test_fetch_branch_raises_when_the_patched_workflow_drops_a_floor_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    missing_input = _shared_workflow(
+        SHARED_RELEASE_INPUTS - {"dry-run"}, set(SHARED_RELEASE_OUTPUTS)
+    )
+    _patched_pin(monkeypatch, missing_input)
+    with pytest.raises(AssertionError, match="'dry-run'"):
+        release_interface()
+    missing_output = _shared_workflow(
+        set(SHARED_RELEASE_INPUTS), set(SHARED_RELEASE_OUTPUTS) - {"commit"}
+    )
+    _patched_pin(monkeypatch, missing_output)
+    with pytest.raises(AssertionError, match="'commit'"):
+        release_interface()
 
 
 @pytest.mark.skipif(not os.environ.get("LIVINGPROOF_NETWORK"), reason="set LIVINGPROOF_NETWORK=1")
